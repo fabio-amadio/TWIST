@@ -1,4 +1,5 @@
 import os, pickle, yaml
+import warnings
 import logging
 
 import torch
@@ -42,7 +43,10 @@ class MotionLib:
         self._motion_dof_pos = []
         self._motion_dof_vel = []
         self._motion_local_body_pos = []
+        self._motion_local_body_rot = []
         self._body_link_list = []
+        self._has_local_body_rot = True
+        self._warned_missing_local_body_rot = False
         
         motion_files, motion_weights = self._fetch_motion_files(motion_file)
         num_motion_files = len(motion_files)
@@ -62,6 +66,11 @@ class MotionLib:
                     root_rot = torch.tensor(motion_data["root_rot"], dtype=torch.float, device=self._device)
                     dof_pos = torch.tensor(motion_data["dof_pos"], dtype=torch.float, device=self._device)
                     local_body_pos = torch.tensor(motion_data["local_body_pos"], dtype=torch.float, device=self._device)
+                    local_body_rot = None
+                    if "local_body_rot" in motion_data:
+                        local_body_rot = torch.tensor(motion_data["local_body_rot"], dtype=torch.float, device=self._device)
+                    else:
+                        self._has_local_body_rot = False
                     if i == 0:
                         self._body_link_list = motion_data["link_body_list"]
                     
@@ -102,6 +111,8 @@ class MotionLib:
                     self._motion_dof_pos.append(dof_pos)
                     self._motion_dof_vel.append(dof_vel)
                     self._motion_local_body_pos.append(local_body_pos)
+                    if local_body_rot is not None:
+                        self._motion_local_body_rot.append(local_body_rot)
             except Exception as e:
                 logger.error(f"Error loading motion file {curr_file}: {e}")
                 continue
@@ -123,6 +134,11 @@ class MotionLib:
         self._motion_dof_pos = torch.cat(self._motion_dof_pos, dim=0)
         self._motion_dof_vel = torch.cat(self._motion_dof_vel, dim=0)
         self._motion_local_body_pos = torch.cat(self._motion_local_body_pos, dim=0)
+        if self._has_local_body_rot and len(self._motion_local_body_rot) > 0:
+            self._motion_local_body_rot = torch.cat(self._motion_local_body_rot, dim=0)
+        elif not self._warned_missing_local_body_rot:
+            warnings.warn("Unable to load local_body_rot from motion pkls.", RuntimeWarning)
+            self._warned_missing_local_body_rot = True
         
         lengths_shifted = self._motion_num_frames.roll(1)
         lengths_shifted[0] = 0
@@ -136,6 +152,9 @@ class MotionLib:
 
     def get_motion_length(self, motion_ids):
         return self._motion_lengths[motion_ids]
+        
+    def has_local_body_rot(self):
+        return self._has_local_body_rot and len(self._motion_local_body_rot) > 0
         
     def num_motions(self):
         return self._motion_weights.shape[0]
@@ -228,6 +247,20 @@ class MotionLib:
         local_key_body_pos = (1.0 - blend_unsqueeze.unsqueeze(1)) * local_key_body_pos0 + blend_unsqueeze.unsqueeze(1) * local_key_body_pos1
         
         return root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, local_key_body_pos
+
+    def calc_local_body_rot(self, motion_ids, motion_times):
+        if not self.has_local_body_rot():
+            return None
+        motion_loop_num = torch.floor(motion_times / self._motion_lengths[motion_ids])
+        motion_times = motion_times - motion_loop_num * self._motion_lengths[motion_ids]
+        frame_idx0, frame_idx1, blend = self._calc_frame_blend(motion_ids, motion_times)
+
+        rot0 = self._motion_local_body_rot[frame_idx0]
+        rot1 = self._motion_local_body_rot[frame_idx1]
+
+        blend_body = blend.unsqueeze(-1).expand(-1, rot0.shape[1])
+        rot = slerp(rot0, rot1, blend_body)
+        return rot
     
     def get_key_body_idx(self, key_body_names):
         key_body_idx = []
