@@ -402,7 +402,7 @@ class G1MimicDistillTaskStuCfg(G1MimicDistillTaskPrivCfg):
         n_priv = 0
 
         n_proprio = 3 + 2 + 3 * num_actions
-        n_mimic_obs = 1 + 3 + 3 + 1 + 3 * NUM_TASK_BODIES + 6 * NUM_TASK_BODIES
+        n_mimic_obs = 1 + 3 + 2 + 1 + 3 * NUM_TASK_BODIES + 6 * NUM_TASK_BODIES
         n_priv_mimic_obs = len(tar_obs_steps) * (
             1 + 3 + 3 + 1 + num_actions + 3 * NUM_KEY_BODIES
         )
@@ -453,7 +453,7 @@ class G1MimicDistillTaskStuRLCfg(G1MimicDistillTaskPrivCfg):
         n_priv = 0
 
         n_proprio = 3 + 2 + 3 * num_actions
-        n_mimic_obs = 1 + 3 + 3 + 1 + 3 * NUM_TASK_BODIES + 6 * NUM_TASK_BODIES
+        n_mimic_obs = 1 + 3 + 2 + 1 + 3 * NUM_TASK_BODIES + 6 * NUM_TASK_BODIES
         n_priv_mimic_obs = len(tar_obs_steps) * (
             1 + 3 + 3 + 1 + num_actions + 3 * NUM_KEY_BODIES
         )
