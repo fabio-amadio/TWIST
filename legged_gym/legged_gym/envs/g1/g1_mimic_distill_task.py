@@ -417,7 +417,7 @@ class G1MimicDistillTask(HumanoidMimic):
             dim=-1,
         )
 
-        # shape: (num_envs, 1, 1+3+3+1+3*num_task_bodies+6*num_task_bodies)
+        # shape: (num_envs, 1, 1+3+2+1+3*num_task_bodies+6*num_task_bodies)
         # student v0
         mimic_obs_buf = torch.cat(
             (
@@ -425,7 +425,7 @@ class G1MimicDistillTask(HumanoidMimic):
                 roll,
                 pitch,
                 yaw,  # 3 dims
-                root_vel,  # 3 dims
+                root_vel[..., 0:2],  # 2 dims, x, y only
                 root_ang_vel[..., 2:3],  # 1 dim, yaw only
                 task_body_pos,  # num_task_bodies * 3 dims
                 task_body_rot,  # num_task_bodies * 6 dims

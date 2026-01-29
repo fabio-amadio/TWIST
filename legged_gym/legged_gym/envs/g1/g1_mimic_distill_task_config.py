@@ -42,9 +42,9 @@ class G1MimicDistillTaskPrivCfg(HumanoidMimicCfg):
 
         n_proprio = 3 + 2 + 3 * num_actions
         # mimic obs (student):
-        #   [root_z(1), rpy(3), root_lin_vel(3), root_ang_vel_yaw(1),
+        #   [root_z(1), rpy(3), root_lin_vel_xy(2), root_ang_vel_yaw(1),
         #    left/right hand pos(3+3), left/right hand rot 6D(6+6)]
-        n_mimic_obs = 1 + 3 + 3 + 1 + 3 * NUM_TASK_BODIES + 6 * NUM_TASK_BODIES
+        n_mimic_obs = 1 + 3 + 2 + 1 + 3 * NUM_TASK_BODIES + 6 * NUM_TASK_BODIES
         # priv_mimic_obs (teacher):
         #   [root_z(1), rpy(3), root_lin_vel(3), root_ang_vel_yaw(1),
         #    dof_pos(23), key_body_pos(3*9)]
