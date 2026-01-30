@@ -110,7 +110,12 @@ class KinematicsModel:
             global_rot = quat_mul(flat_base_rot, flat_local_rot).reshape(local_rot.shape)
 
             flat_local_pos = local_pos.reshape(-1, 3)
-            global_pos = quat_apply(base_rot, flat_local_pos).reshape(local_pos.shape)
+            flat_base_rot = (
+                base_rot.unsqueeze(1)
+                .expand(-1, local_pos.shape[1], -1)
+                .reshape(-1, 4)
+            )
+            global_pos = quat_apply(flat_base_rot, flat_local_pos).reshape(local_pos.shape)
             global_pos = global_pos + base_pos.unsqueeze(1)
 
         return local_pos, local_rot, global_pos, global_rot
