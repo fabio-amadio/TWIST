@@ -87,7 +87,7 @@ You can run the low-level simulation server.
 
 ```bash
 cd deploy_real
-python server_low_level_g1_sim.py --policy_path PATH/TO/YOUR/JIT/MODEL
+python server_low_level_g1_sim_task.py --policy_path PATH/TO/YOUR/JIT/MODEL
 ```
 
 - This will start a simulation that runs the low-level controller only.
@@ -108,7 +108,7 @@ Run the low-level controller first:
 
 ```bash
 cd deploy_real
-python server_low_level_g1_real.py --policy_path PATH/TO/YOUR/JIT/MODEL --net YOUR_NET_INTERFACE_TO_UNITREE_ROBOT
+python server_low_level_g1_real_task.py --policy_path PATH/TO/YOUR/JIT/MODEL --net YOUR_NET_INTERFACE_TO_UNITREE_ROBOT
 ```
 
 Then run the task-based high-level motion server:

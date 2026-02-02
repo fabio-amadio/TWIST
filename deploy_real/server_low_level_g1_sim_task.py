@@ -99,7 +99,7 @@ class RealTimePolicyController:
             print(f"Motor ID {i}: {motor_name}")
             
 
-        self.viewer = mjv.launch_passive(self.model, self.data, show_left_ui=False, show_right_ui=False)
+        self.viewer = mjv.launch_passive(self.model, self.data, show_left_ui=True, show_right_ui=False)
         self.viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_PERTFORCE] = 0
         self.viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT] = 0
         self.viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_TRANSPARENT] = 0
