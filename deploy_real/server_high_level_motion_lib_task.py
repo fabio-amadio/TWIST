@@ -32,7 +32,7 @@ def build_mimic_obs(
     tar_obs_steps,
     task_body_names,
     kinematics_model=None,
-    global_obs: bool = False,
+    robot_type: str = "g1",
 ):
     """
     Build the task-based mimic_obs at time-step t_step.
@@ -50,6 +50,12 @@ def build_mimic_obs(
     root_pos, root_rot, root_vel, root_ang_vel, dof_pos, _, body_pos = motion_lib.calc_motion_frame(
         motion_ids, obs_motion_times
     )
+    if robot_type == "g1":
+        dof_pos_with_wrist = torch.zeros(25, device=device).reshape(1, 1, 25)
+        wrist_ids = [19, 24]
+        other_ids = [f for f in range(25) if f not in wrist_ids]
+        dof_pos_with_wrist[..., other_ids] = dof_pos
+        dof_pos = dof_pos_with_wrist
 
     # Convert to euler (roll, pitch, yaw)
     roll, pitch, yaw = euler_from_quaternion(root_rot)
@@ -57,29 +63,15 @@ def build_mimic_obs(
     pitch = pitch.reshape(1, -1, 1)
     yaw = yaw.reshape(1, -1, 1)
 
-    if not global_obs:
-        root_vel = quat_rotate_inverse_torch(root_rot, root_vel)
-        root_ang_vel = quat_rotate_inverse_torch(root_rot, root_ang_vel)
+    root_vel = quat_rotate_inverse_torch(root_rot, root_vel)
+    root_ang_vel = quat_rotate_inverse_torch(root_rot, root_ang_vel)
 
     task_body_ids = motion_lib.get_key_body_idx(key_body_names=task_body_names)
     task_body_pos = body_pos[:, task_body_ids, :]
-    if global_obs:
-        root_rot_expand = root_rot.unsqueeze(1).expand(-1, task_body_pos.shape[1], -1)
-        flat_root_rot = root_rot_expand.reshape(-1, 4)
-        flat_task_pos = task_body_pos.reshape(-1, 3)
-        flat_task_pos = torch_utils.quat_rotate(flat_root_rot, flat_task_pos)
-        task_body_pos = flat_task_pos.reshape(task_body_pos.shape)
-        task_body_pos = task_body_pos + root_pos.unsqueeze(1)
-
     task_body_rot = None
     local_body_rot = motion_lib.calc_local_body_rot(motion_ids, obs_motion_times)
     if local_body_rot is not None:
         task_body_rot = local_body_rot[:, task_body_ids, :]
-        if global_obs:
-            root_rot_expand = root_rot.unsqueeze(1).expand(-1, task_body_rot.shape[1], -1)
-            flat_root_rot = root_rot_expand.reshape(-1, 4)
-            flat_task_rot = task_body_rot.reshape(-1, 4)
-            task_body_rot = quat_mul(flat_root_rot, flat_task_rot).reshape(task_body_rot.shape)
     else:
         if kinematics_model is None:
             raise RuntimeError(
@@ -88,7 +80,7 @@ def build_mimic_obs(
         local_pos_fk, local_rot_fk, global_pos_fk, global_rot_fk = kinematics_model.forward_kinematics(
             dof_pos, root_pos, root_rot, task_body_names
         )
-        task_body_rot = global_rot_fk if global_obs else local_rot_fk
+        task_body_rot = local_rot_fk
 
     root_pos = root_pos.reshape(1, -1, 3)
     root_vel = root_vel.reshape(1, -1, 3)
@@ -165,19 +157,7 @@ def main(args, xml_file, robot_base):
     
     print(f"[Motion Server] Streaming for {num_steps} steps at dt={control_dt:.3f} seconds...")
 
-    sample_mimic_obs, *_ = build_mimic_obs(
-        motion_lib=motion_lib,
-        t_step=0,
-        control_dt=control_dt,
-        tar_obs_steps=tar_obs_steps_tensor,
-        task_body_names=task_body_names,
-        kinematics_model=kinematics_model,
-        global_obs=args.global_obs,
-    )
-    default_mimic_obs = DEFAULT_MIMIC_OBS.get(args.robot)
-    if default_mimic_obs is None or default_mimic_obs.shape != sample_mimic_obs.shape:
-        default_mimic_obs = np.zeros_like(sample_mimic_obs)
-
+    default_mimic_obs = DEFAULT_MIMIC_OBS[args.robot]
     last_mimic_obs = default_mimic_obs
     vis_root_vel = False
     vis_root_ang_vel = False
@@ -198,7 +178,7 @@ def main(args, xml_file, robot_base):
                 tar_obs_steps=tar_obs_steps_tensor,
                 task_body_names=task_body_names,
                 kinematics_model=kinematics_model,
-                global_obs=args.global_obs,
+                robot_type=args.robot,
             )
             if vis_root_vel:
                 root_vel_list.append(root_vel)
@@ -237,11 +217,11 @@ def main(args, xml_file, robot_base):
         # do linear interpolation to the last mimic_obs
         time_back_to_default = 2.0
         for i in range(int(time_back_to_default / control_dt)):
-            interp_mimic_obs = last_mimic_obs + (default_mimic_obs - last_mimic_obs) * (i / (time_back_to_default / control_dt))
+            interp_mimic_obs = last_mimic_obs + (DEFAULT_MIMIC_OBS[args.robot] - last_mimic_obs) * (i / (time_back_to_default / control_dt))
             redis_client.set(f"action_mimic_{args.robot}", json.dumps(interp_mimic_obs.tolist()))
             redis_client.set(f"action_hand_{args.robot}", json.dumps(DEFAULT_ACTION_HAND[args.robot].tolist()))
             time.sleep(control_dt)
-        redis_client.set(f"action_mimic_{args.robot}", json.dumps(default_mimic_obs.tolist()))
+        redis_client.set(f"action_mimic_{args.robot}", json.dumps(DEFAULT_MIMIC_OBS[args.robot].tolist()))
         redis_client.set(f"action_hand_{args.robot}", json.dumps(DEFAULT_ACTION_HAND[args.robot].tolist()))
         last_mimic_obs = DEFAULT_MIMIC_OBS[args.robot]
         exit()
@@ -255,11 +235,11 @@ def main(args, xml_file, robot_base):
         # do linear interpolation to the last mimic_obs
         time_back_to_default = 2.0
         for i in range(int(time_back_to_default / control_dt)):
-            interp_mimic_obs = last_mimic_obs + (default_mimic_obs - last_mimic_obs) * (i / (time_back_to_default / control_dt))
+            interp_mimic_obs = last_mimic_obs + (DEFAULT_MIMIC_OBS[args.robot] - last_mimic_obs) * (i / (time_back_to_default / control_dt))
             redis_client.set(f"action_mimic_{args.robot}", json.dumps(interp_mimic_obs.tolist()))
             redis_client.set(f"action_hand_{args.robot}", json.dumps(DEFAULT_ACTION_HAND[args.robot].tolist()))
             time.sleep(control_dt)
-        redis_client.set(f"action_mimic_{args.robot}", json.dumps(default_mimic_obs.tolist()))
+        redis_client.set(f"action_mimic_{args.robot}", json.dumps(DEFAULT_MIMIC_OBS[args.robot].tolist()))
         redis_client.set(f"action_hand_{args.robot}", json.dumps(DEFAULT_ACTION_HAND[args.robot].tolist()))
         last_mimic_obs = DEFAULT_MIMIC_OBS[args.robot]
         exit()
@@ -276,8 +256,6 @@ if __name__ == "__main__":
     parser.add_argument("--task_bodies", type=str,
                         default="left_rubber_hand,right_rubber_hand",
                         help="Comma-separated task body names for mimic obs")
-    parser.add_argument("--global_obs", action="store_true",
-                        help="Use global frame for velocities and body poses")
     parser.add_argument(
         "--urdf",
         type=str,
@@ -293,7 +271,6 @@ if __name__ == "__main__":
     print("Motion file: ", args.motion_file)
     print("Steps: ", args.steps)
     print("Task bodies: ", args.task_bodies)
-    print("Global obs: ", args.global_obs)
     
     HERE = os.path.dirname(os.path.abspath(__file__))
     
