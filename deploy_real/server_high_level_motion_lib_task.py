@@ -64,7 +64,11 @@ def build_mimic_obs(
     task_body_ids = motion_lib.get_key_body_idx(key_body_names=task_body_names)
     task_body_pos = body_pos[:, task_body_ids, :]
     if global_obs:
-        task_body_pos = torch_utils.quat_rotate(root_rot, task_body_pos)
+        root_rot_expand = root_rot.unsqueeze(1).expand(-1, task_body_pos.shape[1], -1)
+        flat_root_rot = root_rot_expand.reshape(-1, 4)
+        flat_task_pos = task_body_pos.reshape(-1, 3)
+        flat_task_pos = torch_utils.quat_rotate(flat_root_rot, flat_task_pos)
+        task_body_pos = flat_task_pos.reshape(task_body_pos.shape)
         task_body_pos = task_body_pos + root_pos.unsqueeze(1)
 
     task_body_rot = None
@@ -89,10 +93,10 @@ def build_mimic_obs(
     root_pos = root_pos.reshape(1, -1, 3)
     root_vel = root_vel.reshape(1, -1, 3)
     root_ang_vel = root_ang_vel.reshape(1, -1, 3)
-    task_body_pos = task_body_pos.reshape(1, -1, task_body_pos.shape[-1])
+    task_body_pos = task_body_pos.reshape(1, task_body_pos.shape[0], -1)
     task_body_rot = task_body_rot.reshape(-1, 4)
     task_body_rot = torch_utils.quat_to_tan_norm(task_body_rot)
-    task_body_rot = task_body_rot.reshape(1, -1, task_body_rot.shape[-1])
+    task_body_rot = task_body_rot.reshape(1, task_body_pos.shape[1], -1)
 
     mimic_obs_buf = torch.cat(
         (
@@ -100,7 +104,7 @@ def build_mimic_obs(
             roll,
             pitch,
             yaw,
-            root_vel,
+            root_vel[..., 0:2],
             root_ang_vel[..., 2:3],
             task_body_pos,
             task_body_rot,
