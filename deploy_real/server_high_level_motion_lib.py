@@ -169,6 +169,11 @@ def main(args, xml_file, robot_base):
                 
             # Sleep to maintain real-time pace
             elapsed = time.time() - t0
+            if t_step % 50 == 0:
+                print(
+                    f"[Timing] step={t_step} elapsed={elapsed*1000:.2f}ms "
+                    f"budget={control_dt*1000:.2f}ms"
+                )
             if elapsed < control_dt:
                 time.sleep(control_dt - elapsed)
         
