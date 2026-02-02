@@ -255,7 +255,7 @@ class RealTimePolicyController:
 
                     # Try to get the latest mimic obs from Redis
                     try:
-                        action_mimic_json = self.redis_client.get("action_mimic_g1")
+                        action_mimic_json = self.redis_client.get(self.redis_mimic_key)
                         if action_mimic_json is not None:
                             action_mimic_list = json.loads(action_mimic_json)
                             action_mimic = np.array(action_mimic_list, dtype=np.float32)
@@ -319,6 +319,7 @@ def main_low_level_sim(args):
         device='cuda',
         record_video=args.record_video,
     )
+    controller.redis_mimic_key = args.redis_mimic_key
     controller.run()
 
 
@@ -333,6 +334,8 @@ if __name__ == "__main__":
                         )
                         
     parser.add_argument("--record_video", action="store_true", help="Record a video")
+    parser.add_argument("--redis_mimic_key", type=str, default="action_mimic_task_g1",
+                        help="Redis key for task mimic obs")
     args = parser.parse_args()
 
     args.record_proprio = True

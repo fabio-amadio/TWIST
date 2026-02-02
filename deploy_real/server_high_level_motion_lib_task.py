@@ -187,7 +187,7 @@ def main(args, xml_file, robot_base):
 
             # Convert to JSON (list) to put into Redis
             mimic_obs_list = mimic_obs.tolist() if mimic_obs.ndim == 1 else mimic_obs.flatten().tolist()
-            redis_client.set(f"action_mimic_{args.robot}", json.dumps(mimic_obs_list))
+            redis_client.set(args.redis_mimic_key, json.dumps(mimic_obs_list))
             redis_client.set(f"action_hand_{args.robot}", json.dumps(DEFAULT_ACTION_HAND[args.robot].tolist()))
             last_mimic_obs = mimic_obs
             # Print or log it
@@ -223,10 +223,10 @@ def main(args, xml_file, robot_base):
         time_back_to_default = 2.0
         for i in range(int(time_back_to_default / control_dt)):
             interp_mimic_obs = last_mimic_obs + (DEFAULT_MIMIC_OBS[args.robot] - last_mimic_obs) * (i / (time_back_to_default / control_dt))
-            redis_client.set(f"action_mimic_{args.robot}", json.dumps(interp_mimic_obs.tolist()))
+            redis_client.set(args.redis_mimic_key, json.dumps(interp_mimic_obs.tolist()))
             redis_client.set(f"action_hand_{args.robot}", json.dumps(DEFAULT_ACTION_HAND[args.robot].tolist()))
             time.sleep(control_dt)
-        redis_client.set(f"action_mimic_{args.robot}", json.dumps(DEFAULT_MIMIC_OBS[args.robot].tolist()))
+        redis_client.set(args.redis_mimic_key, json.dumps(DEFAULT_MIMIC_OBS[args.robot].tolist()))
         redis_client.set(f"action_hand_{args.robot}", json.dumps(DEFAULT_ACTION_HAND[args.robot].tolist()))
         last_mimic_obs = DEFAULT_MIMIC_OBS[args.robot]
         exit()
@@ -241,10 +241,10 @@ def main(args, xml_file, robot_base):
         time_back_to_default = 2.0
         for i in range(int(time_back_to_default / control_dt)):
             interp_mimic_obs = last_mimic_obs + (DEFAULT_MIMIC_OBS[args.robot] - last_mimic_obs) * (i / (time_back_to_default / control_dt))
-            redis_client.set(f"action_mimic_{args.robot}", json.dumps(interp_mimic_obs.tolist()))
+            redis_client.set(args.redis_mimic_key, json.dumps(interp_mimic_obs.tolist()))
             redis_client.set(f"action_hand_{args.robot}", json.dumps(DEFAULT_ACTION_HAND[args.robot].tolist()))
             time.sleep(control_dt)
-        redis_client.set(f"action_mimic_{args.robot}", json.dumps(DEFAULT_MIMIC_OBS[args.robot].tolist()))
+        redis_client.set(args.redis_mimic_key, json.dumps(DEFAULT_MIMIC_OBS[args.robot].tolist()))
         redis_client.set(f"action_hand_{args.robot}", json.dumps(DEFAULT_ACTION_HAND[args.robot].tolist()))
         last_mimic_obs = DEFAULT_MIMIC_OBS[args.robot]
         exit()
@@ -268,6 +268,8 @@ if __name__ == "__main__":
         help="URDF path for FK fallback if local_body_rot is missing",
     )
     parser.add_argument("--vis", action="store_true", help="Visualize the motion")
+    parser.add_argument("--redis_mimic_key", type=str, default="action_mimic_task_g1",
+                        help="Redis key for task mimic obs")
     args = parser.parse_args()
 
     args.vis = True
