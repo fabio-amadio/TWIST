@@ -72,13 +72,13 @@ bash train_student_task.sh 0101_twist_rlbcstu_task 0101_twist_teacher_task cuda:
 **3**. Export student policy to jit model:
 
 ```bash
-bash to_jit.sh 0101_twist_rlbcstu_task
+bash to_jit_task.sh 0101_twist_rlbcstu_task
 ```
 
 You should see something like this:
 
 ```bash
-Saved traced_actor at /PATH/TO/TWIST/legged_gym/logs/g1_stu_rl/0101_twist_rlbcstu_task/traced/0101_twist_rlbcstu-47500-jit.pt
+Saved traced_actor at /PATH/TO/TWIST/legged_gym/logs/g1_stu_rl_task/0101_twist_rlbcstu_task/traced/0101_twist_rlbcstu-47500-jit.pt
 Robot: g1
 ```
 
