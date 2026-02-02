@@ -170,10 +170,11 @@ class RealTimePolicyController:
         # For multi-step history
         # task-based mimic obs: 1+3+2+1+3*2+6*2
         self.n_mimic_obs = 25
-        self.n_proprio = self.n_mimic_obs + 3 + 2 + 3*self.num_actions
+        self.n_proprio = 3 + 2 + 3 * self.num_actions
+        self.n_obs_single = self.n_mimic_obs + self.n_proprio
         self.proprio_history_buf = deque(maxlen=10)
         for _ in range(10):
-            self.proprio_history_buf.append(np.zeros(self.n_proprio))
+            self.proprio_history_buf.append(np.zeros(self.n_obs_single))
 
         self.record_video = record_video
 
