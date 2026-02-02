@@ -275,6 +275,7 @@ class G1MimicDistillTask(HumanoidMimic):
         self._task_body_ids_motion = self._motion_lib.get_key_body_idx(
             key_body_names=self._task_body_names
         )
+        self._task_body_ids = self._build_body_ids_tensor(self._task_body_names)
         self._kinematics_model = None
         if not self._motion_lib.has_local_body_rot():
             self._kinematics_model = KinematicsModel(
@@ -579,6 +580,88 @@ class G1MimicDistillTask(HumanoidMimic):
     ###########################################################################
     ###################### Extra Reward Functions##############################
     ###########################################################################
+
+    def _reward_tracking_root_vel_xy(self):
+        if self.global_obs:
+            root_vel_diff = self._ref_root_vel[:, 0:2] - self.root_states[:, 7:9]
+        else:
+            local_ref_root_vel = quat_rotate_inverse(
+                self._ref_root_rot, self._ref_root_vel
+            )
+            root_vel_diff = (
+                local_ref_root_vel[:, 0:2] - self.base_lin_vel[:, 0:2]
+            )
+        root_vel_err = torch.sum(root_vel_diff * root_vel_diff, dim=-1)
+        return torch.exp(-1.0 * root_vel_err)
+
+    def _reward_tracking_root_ang_vel_yaw(self):
+        if self.global_obs:
+            root_ang_vel_diff = (
+                self._ref_root_ang_vel[:, 2] - self.root_states[:, 12]
+            )
+        else:
+            local_ref_root_ang_vel = quat_rotate_inverse(
+                self._ref_root_rot, self._ref_root_ang_vel
+            )
+            root_ang_vel_diff = (
+                local_ref_root_ang_vel[:, 2] - self.base_ang_vel[:, 2]
+            )
+        root_ang_vel_err = root_ang_vel_diff * root_ang_vel_diff
+        return torch.exp(-1.0 * root_ang_vel_err)
+
+    def _reward_tracking_task_body_pos(self):
+        task_body_pos = (
+            self.rigid_body_states[:, self._task_body_ids, 0:3]
+            - self.root_states[:, 0:3].unsqueeze(1)
+        )
+        task_body_pos = convert_to_local_root_body_pos(
+            self.root_states[:, 3:7], task_body_pos
+        )
+        tar_body_pos = (
+            self._ref_body_pos[:, self._task_body_ids, :]
+            - self._ref_root_pos.unsqueeze(1)
+        )
+        tar_body_pos = convert_to_local_root_body_pos(
+            self._ref_root_rot, tar_body_pos
+        )
+        task_body_pos_diff = task_body_pos - tar_body_pos
+        task_body_pos_err = torch.sum(task_body_pos_diff * task_body_pos_diff, dim=-1)
+        task_body_pos_err = torch.sum(task_body_pos_err, dim=-1)
+        return torch.exp(-10.0 * task_body_pos_err)
+
+    def _reward_tracking_task_body_rot(self):
+        task_body_rot = self.rigid_body_states[:, self._task_body_ids, 3:7]
+        root_rot = self.root_states[:, 3:7]
+        root_inv_rot = torch_utils.quat_conjugate(root_rot)
+        root_inv_rot = root_inv_rot.unsqueeze(1).expand(-1, task_body_rot.shape[1], -1)
+        flat_root_inv = root_inv_rot.reshape(-1, 4)
+        flat_body_rot = task_body_rot.reshape(-1, 4)
+        local_task_rot = quat_mul(flat_root_inv, flat_body_rot).reshape(
+            task_body_rot.shape
+        )
+
+        motion_times = self._get_motion_times()
+        ref_local_body_rot = self._motion_lib.calc_local_body_rot(
+            self._motion_ids, motion_times
+        )
+        if ref_local_body_rot is None:
+            if self._kinematics_model is None:
+                return torch.zeros(self.num_envs, device=self.device)
+            _, ref_local_body_rot, _, _ = self._kinematics_model.forward_kinematics(
+                self._ref_dof_pos,
+                self._ref_root_pos,
+                self._ref_root_rot,
+                self._task_body_names,
+            )
+        else:
+            ref_local_body_rot = ref_local_body_rot[:, self._task_body_ids_motion, :]
+
+        flat_ref_rot = ref_local_body_rot.reshape(-1, 4)
+        flat_cur_rot = local_task_rot.reshape(-1, 4)
+        rot_err = torch_utils.quat_diff_angle(flat_cur_rot, flat_ref_rot)
+        rot_err = rot_err * rot_err
+        rot_err = rot_err.reshape(self.num_envs, -1).sum(dim=1)
+        return torch.exp(-5.0 * rot_err)
 
     def _reward_waist_dof_acc(self):
         waist_dof_idx = [13, 14]
