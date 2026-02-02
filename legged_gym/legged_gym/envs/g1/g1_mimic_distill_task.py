@@ -609,6 +609,11 @@ class G1MimicDistillTask(HumanoidMimic):
         root_ang_vel_err = root_ang_vel_diff * root_ang_vel_diff
         return torch.exp(-1.0 * root_ang_vel_err)
 
+    def _reward_tracking_root_height(self):
+        height_diff = self._ref_root_pos[:, 2] - self.root_states[:, 2]
+        height_err = height_diff * height_diff
+        return torch.exp(-5.0 * height_err)
+
     def _reward_tracking_task_body_pos(self):
         task_body_pos = (
             self.rigid_body_states[:, self._task_body_ids, 0:3]
