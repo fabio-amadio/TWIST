@@ -104,8 +104,30 @@ def play(args):
     load_run = os.path.dirname(load_path)
     cprint(f"Loading model from: {load_path}", "green")
     ac_state_dict = torch.load(load_path, map_location=device)
+
+    state_dict = ac_state_dict.get("model_state_dict", {})
+    motion_w = state_dict.get("actor.motion_encoder.encoder.0.weight")
+    actor0_w = state_dict.get("actor.actor_backbone.0.weight")
+    motion_out_w = state_dict.get("actor.motion_encoder.linear_output.weight")
+    if motion_w is not None and motion_w.shape[1] != n_mimic_obs:
+        raise RuntimeError(
+            f"Checkpoint n_mimic_obs={motion_w.shape[1]} does not match task setting "
+            f"{n_mimic_obs}. Use a task-trained checkpoint."
+        )
+    if actor0_w is not None and motion_out_w is not None:
+        inferred_num_obs = actor0_w.shape[1] - motion_out_w.shape[0]
+        if inferred_num_obs != num_observations:
+            raise RuntimeError(
+                f"Checkpoint num_obs={inferred_num_obs} does not match task setting "
+                f"{num_observations}. Check history_len or obs config."
+            )
     policy.load_state_dict(ac_state_dict['model_state_dict'], strict=False)
     policy.load_normalizer(ac_state_dict['normalizer'])
+    if policy.normalizer is not None and policy.normalizer.get_shape()[0] != num_observations:
+        raise RuntimeError(
+            f"Normalizer size {policy.normalizer.get_shape()[0]} does not match num_obs "
+            f"{num_observations}. Use a task-trained checkpoint."
+        )
     
     policy = policy.to(device)#.cpu()
     if not os.path.exists(os.path.join(load_run, "traced")):
