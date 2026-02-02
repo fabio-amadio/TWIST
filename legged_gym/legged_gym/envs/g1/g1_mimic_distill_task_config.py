@@ -3,8 +3,7 @@ from legged_gym.envs.base.humanoid_mimic_config import (
     HumanoidMimicCfgPPO,
 )
 from legged_gym import LEGGED_GYM_ROOT_DIR
-
-NUM_TASK_BODIES = 2
+from legged_gym.envs.g1.task_obs_defs import NUM_TASK_BODIES, TASK_MIMIC_OBS_DIM
 NUM_KEY_BODIES = 9
 
 
@@ -44,7 +43,7 @@ class G1MimicDistillTaskPrivCfg(HumanoidMimicCfg):
         # mimic obs (student):
         #   [root_z(1), rpy(3), root_lin_vel_xy(2), root_ang_vel_yaw(1),
         #    left/right hand pos(3+3), left/right hand rot 6D(6+6)]
-        n_mimic_obs = 1 + 3 + 2 + 1 + 3 * NUM_TASK_BODIES + 6 * NUM_TASK_BODIES
+        n_mimic_obs = TASK_MIMIC_OBS_DIM
         # priv_mimic_obs (teacher):
         #   [root_z(1), rpy(3), root_lin_vel(3), root_ang_vel_yaw(1),
         #    dof_pos(23), key_body_pos(3*9)]
@@ -402,7 +401,7 @@ class G1MimicDistillTaskStuCfg(G1MimicDistillTaskPrivCfg):
         n_priv = 0
 
         n_proprio = 3 + 2 + 3 * num_actions
-        n_mimic_obs = 1 + 3 + 2 + 1 + 3 * NUM_TASK_BODIES + 6 * NUM_TASK_BODIES
+        n_mimic_obs = TASK_MIMIC_OBS_DIM
         n_priv_mimic_obs = len(tar_obs_steps) * (
             1 + 3 + 3 + 1 + num_actions + 3 * NUM_KEY_BODIES
         )
@@ -453,7 +452,7 @@ class G1MimicDistillTaskStuRLCfg(G1MimicDistillTaskPrivCfg):
         n_priv = 0
 
         n_proprio = 3 + 2 + 3 * num_actions
-        n_mimic_obs = 1 + 3 + 2 + 1 + 3 * NUM_TASK_BODIES + 6 * NUM_TASK_BODIES
+        n_mimic_obs = TASK_MIMIC_OBS_DIM
         n_priv_mimic_obs = len(tar_obs_steps) * (
             1 + 3 + 3 + 1 + num_actions + 3 * NUM_KEY_BODIES
         )
