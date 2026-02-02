@@ -245,6 +245,11 @@ def main(args, xml_file, robot_base):
         redis_client.set(f"action_hand_{args.robot}", json.dumps(DEFAULT_ACTION_HAND[args.robot].tolist()))
         last_mimic_obs = DEFAULT_MIMIC_OBS[args.robot]
         exit()
+    except Exception:
+        print("[Motion Server] Exception in streaming loop. Interpolating to default mimic_obs...")
+        import traceback
+        traceback.print_exc()
+        # fall through to finally for interpolation + exit
     finally:
         print("[Motion Server] Exiting...Interpolating to default mimic_obs...")
         # do linear interpolation to the last mimic_obs
