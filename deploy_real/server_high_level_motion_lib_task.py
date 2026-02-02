@@ -50,13 +50,6 @@ def build_mimic_obs(
     root_pos, root_rot, root_vel, root_ang_vel, dof_pos, _, body_pos = motion_lib.calc_motion_frame(
         motion_ids, obs_motion_times
     )
-    if robot_type == "g1":
-        dof_pos_with_wrist = torch.zeros(25, device=device).reshape(1, 1, 25)
-        wrist_ids = [19, 24]
-        other_ids = [f for f in range(25) if f not in wrist_ids]
-        dof_pos_with_wrist[..., other_ids] = dof_pos
-        dof_pos = dof_pos_with_wrist
-
     # Convert to euler (roll, pitch, yaw)
     roll, pitch, yaw = euler_from_quaternion(root_rot)
     roll = roll.reshape(1, -1, 1)
@@ -89,6 +82,13 @@ def build_mimic_obs(
     task_body_rot = task_body_rot.reshape(-1, 4)
     task_body_rot = torch_utils.quat_to_tan_norm(task_body_rot)
     task_body_rot = task_body_rot.reshape(1, task_body_pos.shape[1], -1)
+    dof_pos_for_vis = dof_pos
+    if robot_type == "g1":
+        dof_pos_with_wrist = torch.zeros(25, device=device).reshape(1, 1, 25)
+        wrist_ids = [19, 24]
+        other_ids = [f for f in range(25) if f not in wrist_ids]
+        dof_pos_with_wrist[..., other_ids] = dof_pos
+        dof_pos_for_vis = dof_pos_with_wrist
 
     mimic_obs_buf = torch.cat(
         (
@@ -106,7 +106,7 @@ def build_mimic_obs(
     mimic_obs_buf = mimic_obs_buf.reshape(1, -1)
     
     return mimic_obs_buf.detach().cpu().numpy().squeeze(), root_pos.detach().cpu().numpy().squeeze(), \
-        root_rot.detach().cpu().numpy().squeeze(), dof_pos.detach().cpu().numpy().squeeze(), \
+        root_rot.detach().cpu().numpy().squeeze(), dof_pos_for_vis.detach().cpu().numpy().squeeze(), \
             root_vel.detach().cpu().numpy().squeeze(), root_ang_vel.detach().cpu().numpy().squeeze()
 
 
