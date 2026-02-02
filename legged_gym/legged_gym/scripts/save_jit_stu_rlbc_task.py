@@ -75,8 +75,8 @@ def play(args):
     if args.robot == "g1":
         num_actions = 23
         n_proprio = 3 + 2 + 3*num_actions
-        # task-based mimic obs: 1+3+3+1+3*2+6*2
-        n_mimic_obs = 26
+        # task-based mimic obs: 1+3+2+1+3*2+6*2
+        n_mimic_obs = 25
         n_obs_single = n_mimic_obs + n_proprio
         num_observations = n_obs_single * (history_len + 1)
     elif args.robot == "t1":
