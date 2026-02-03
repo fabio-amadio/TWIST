@@ -247,11 +247,12 @@ class G1MimicDistillTaskPrivCfg(HumanoidMimicCfg):
             tracking_root_vel = 1.0
             # tracking_keybody_pos = 0.6
             tracking_keybody_pos = 2.0
-            tracking_root_vel_xy = 1.0
-            tracking_root_ang_vel_yaw = 1.0
-            tracking_root_height = 1.0
-            tracking_task_body_pos = 2.0
+            # task-env terms
             tracking_task_body_rot = 1.0
+            tracking_task_body_pos = 0.0
+            tracking_root_vel_xy = 0.0
+            tracking_root_ang_vel_yaw = 0.0
+            tracking_root_height = 0.0
 
             # alive = 0.5
 
@@ -503,11 +504,12 @@ class G1MimicDistillTaskStuRLCfg(G1MimicDistillTaskPrivCfg):
             tracking_root_vel = 1.0
             # tracking_keybody_pos = 0.6
             tracking_keybody_pos = 2.0
-            tracking_root_vel_xy = 1.0
-            tracking_root_ang_vel_yaw = 1.0
-            tracking_root_height = 1.0
-            tracking_task_body_pos = 2.0
+            # task-env terms
             tracking_task_body_rot = 1.0
+            tracking_task_body_pos = 0.0
+            tracking_root_vel_xy = 0.0
+            tracking_root_ang_vel_yaw = 0.0
+            tracking_root_height = 0.0
 
             # alive = 0.5
 
