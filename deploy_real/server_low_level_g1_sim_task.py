@@ -4,12 +4,12 @@ import time
 import numpy as np
 import redis
 import mujoco
+import isaacgym
 import torch
 from rich import print
 from collections import deque
 import mujoco.viewer as mjv
 from tqdm import tqdm
-from data_utils.params import DEFAULT_MIMIC_OBS
 from legged_gym.envs.g1.task_obs_defs import TASK_MIMIC_OBS_DIM
 import os
 from data_utils.rot_utils import quatToEuler
@@ -123,14 +123,6 @@ class RealTimePolicyController:
                 0.0, 0.4, 0.0, 1.2,
                 0.0, -0.4, 0.0, 1.2,
             ])
-        """
-        mimic_obs = np.concatenate([
-        root_pos[2:3],      # just the z for height
-        rpy,                # roll, pitch, yaw
-        root_vel_relative,  # local root vel
-        dof_pos])
-        """
-        self.default_mimic_obs = DEFAULT_MIMIC_OBS["g1"]
         self.mujoco_default_dof_pos = np.concatenate([
             np.array([0, 0, 0.793]),
             np.array([0, 0, 0, 1]),

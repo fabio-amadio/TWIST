@@ -11,7 +11,7 @@ import os
 # ---------------------------------------------------------------------
 # Example imports: adapt to your actual file structure
 # ---------------------------------------------------------------------
-from data_utils.params import DEFAULT_MIMIC_OBS, DEFAULT_ACTION_HAND
+from legged_gym.envs.g1.task_obs_defs import TASK_MIMIC_OBS_DIM
 from pose.util_funcs.kinematics_model import KinematicsModel
 from pose.utils import torch_utils
 from data_utils.rot_utils import euler_from_quaternion
@@ -50,40 +50,41 @@ def build_static_mimic_obs():
 
     root_pos = torch.tensor([0.0, 0.0, 0.793], dtype=torch.float32, device=device).unsqueeze(0)
     root_rot = torch.tensor([0.0, 0.0, 0.0, 1.0], dtype=torch.float32, device=device).unsqueeze(0)
+    root_pos = root_pos.reshape(1, 1, 3)
 
     task_body_names = ["left_rubber_hand", "right_rubber_hand"]
     local_pos_fk, local_rot_fk, _, _ = kinematics_model.forward_kinematics(
         dof_pos, root_pos, root_rot, task_body_names
     )
 
-    roll, pitch, yaw = euler_from_quaternion(root_rot)
-    roll = roll.reshape(1, 1, 1)
-    pitch = pitch.reshape(1, 1, 1)
-    yaw = yaw.reshape(1, 1, 1)
+    # roll, pitch, yaw = euler_from_quaternion(root_rot)
+    # roll = roll.reshape(1, 1, 1)
+    # pitch = pitch.reshape(1, 1, 1)
+    # yaw = yaw.reshape(1, 1, 1)
 
     root_vel = torch.zeros((1, 1, 3), dtype=torch.float32, device=device)
     root_ang_vel = torch.zeros((1, 1, 3), dtype=torch.float32, device=device)
     task_body_pos = local_pos_fk.reshape(1, 1, -1)
     task_body_rot = local_rot_fk.reshape(-1, 4)
-    print("quat", task_body_rot)
     task_body_rot = torch_utils.quat_to_tan_norm(task_body_rot).reshape(1, 1, -1)
-
-    print("6d", task_body_rot)
 
     mimic_obs_buf = torch.cat(
         (
-            root_pos.reshape(1, 1, 3)[..., 2:3],  # root_z
-            roll,
-            pitch,
-            yaw,
-            root_vel[..., 0:2],
-            root_ang_vel[..., 2:3],
-            task_body_pos,
-            task_body_rot,
+            root_pos[..., 2:3],  # 1 dim
+            root_vel[..., 0:2],  # 2 dims, x, y only
+            root_ang_vel[..., 2:3],  # 1 dim, yaw only
+            task_body_pos,  # num_task_bodies * 3 dims
+            task_body_rot,  # num_task_bodies * 6 dims
         ),
         dim=-1,
     )[:, 0:1]
-    return mimic_obs_buf.reshape(1, -1).detach().cpu().numpy().squeeze().astype(np.float32)
+    mimic_obs_buf = mimic_obs_buf.reshape(1, -1)
+    if mimic_obs_buf.shape[1] != TASK_MIMIC_OBS_DIM:
+        raise RuntimeError(
+            f"Task mimic_obs dim mismatch: got {mimic_obs_buf.shape[1]}, "
+            f"expected {TASK_MIMIC_OBS_DIM}"
+        )
+    return mimic_obs_buf.detach().cpu().numpy().squeeze().astype(np.float32)
 
 
 def main(args, static_mimic_obs):
@@ -97,8 +98,6 @@ def main(args, static_mimic_obs):
     
     print(f"[Motion Server] Streaming for {num_steps} steps at dt={control_dt:.3f} seconds...")
 
-    default_mimic_obs = DEFAULT_MIMIC_OBS[args.robot]
-    last_mimic_obs = default_mimic_obs
     vis_root_vel = False
     vis_root_ang_vel = False
     if vis_root_vel:
@@ -116,7 +115,6 @@ def main(args, static_mimic_obs):
             # Convert to JSON (list) to put into Redis
             mimic_obs_list = mimic_obs.tolist() if mimic_obs.ndim == 1 else mimic_obs.flatten().tolist()
             redis_client.set(args.redis_mimic_key, json.dumps(mimic_obs_list))
-            redis_client.set(f"action_hand_{args.robot}", json.dumps(DEFAULT_ACTION_HAND[args.robot].tolist()))
             last_mimic_obs = mimic_obs
             # Print or log it
             print(f"Step {t_step:4d} => mimic_obs shape = {mimic_obs.shape} published...", end="\r")
@@ -133,17 +131,7 @@ def main(args, static_mimic_obs):
                 time.sleep(control_dt - elapsed)
         
     except KeyboardInterrupt:
-        print("[Motion Server] Keyboard interrupt. Interpolating to default mimic_obs...")
-        # do linear interpolation to the last mimic_obs
-        time_back_to_default = 2.0
-        for i in range(int(time_back_to_default / control_dt)):
-            interp_mimic_obs = last_mimic_obs + (DEFAULT_MIMIC_OBS[args.robot] - last_mimic_obs) * (i / (time_back_to_default / control_dt))
-            redis_client.set(args.redis_mimic_key, json.dumps(interp_mimic_obs.tolist()))
-            redis_client.set(f"action_hand_{args.robot}", json.dumps(DEFAULT_ACTION_HAND[args.robot].tolist()))
-            time.sleep(control_dt)
-        redis_client.set(args.redis_mimic_key, json.dumps(DEFAULT_MIMIC_OBS[args.robot].tolist()))
-        redis_client.set(f"action_hand_{args.robot}", json.dumps(DEFAULT_ACTION_HAND[args.robot].tolist()))
-        last_mimic_obs = DEFAULT_MIMIC_OBS[args.robot]
+        print("[Motion Server] Keyboard interrupt. Exiting without interpolation.")
         exit()
     except Exception:
         print("[Motion Server] Exception in streaming loop. Interpolating to default mimic_obs...")
@@ -151,18 +139,7 @@ def main(args, static_mimic_obs):
         traceback.print_exc()
         # fall through to finally for interpolation + exit
     finally:
-        print("[Motion Server] Exiting...Interpolating to default mimic_obs...")
-        # do linear interpolation to the last mimic_obs
-        time_back_to_default = 2.0
-        for i in range(int(time_back_to_default / control_dt)):
-            interp_mimic_obs = last_mimic_obs + (DEFAULT_MIMIC_OBS[args.robot] - last_mimic_obs) * (i / (time_back_to_default / control_dt))
-            redis_client.set(args.redis_mimic_key, json.dumps(interp_mimic_obs.tolist()))
-            redis_client.set(f"action_hand_{args.robot}", json.dumps(DEFAULT_ACTION_HAND[args.robot].tolist()))
-            time.sleep(control_dt)
-        redis_client.set(args.redis_mimic_key, json.dumps(DEFAULT_MIMIC_OBS[args.robot].tolist()))
-        redis_client.set(f"action_hand_{args.robot}", json.dumps(DEFAULT_ACTION_HAND[args.robot].tolist()))
-        last_mimic_obs = DEFAULT_MIMIC_OBS[args.robot]
-        exit()
+        print("[Motion Server] Exiting...")
     
 
 if __name__ == "__main__":

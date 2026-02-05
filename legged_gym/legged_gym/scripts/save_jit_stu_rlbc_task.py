@@ -1,4 +1,5 @@
 import os, sys
+import isaacgym
 
 sys.path.append("../../../rsl_rl")
 import torch
