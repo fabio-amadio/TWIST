@@ -3,6 +3,11 @@
 
 UniTask‑LM unifies locomotion and manipulation by tracking task‑space references for the base and both hands. This makes the policy usable beyond teleop—e.g., as a low‑level controller for IK or generative planners.
 
+## NOTES
+
+- [ ] Training with the **G1-23dof** &rarr; hard to track EE orientation without wrist joints &rarr; **TODO**: use the **G1-29dof**
+- [ ] Currently representing **rotations** using the **tangent and normal vectors** (not the first two columns of **R**)
+
 ## Installation
 
 The training can be run on a single Nvidia RTX 4090 with 24G memory in 1~2 days.
