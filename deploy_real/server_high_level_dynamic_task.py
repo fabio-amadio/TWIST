@@ -24,18 +24,6 @@ def build_static_mimic_obs():
         device=device,
     )
 
-    # default pose (23 dof, no wrist roll)
-    # dof_pos = torch.tensor(
-    #     [
-    #         -0.2, 0.0, 0.0, 0.4, -0.2, 0.0,  # left leg
-    #         -0.2, 0.0, 0.0, 0.4, -0.2, 0.0,  # right leg
-    #         0.0, 0.0, 0.0,  # torso
-    #         0.0, 0.4, 0.0, 1.2,  # left arm
-    #         0.0, -0.4, 0.0, 1.2,  # right arm
-    #     ],
-    #     dtype=torch.float32,
-    #     device=device,
-    # ).unsqueeze(0)
     dof_pos = torch.tensor(
         [
             -0.2, 0.0, 0.0, 0.4, -0.2, 0.0,  # left leg
@@ -68,7 +56,7 @@ def build_static_mimic_obs():
     task_body_rot = local_rot_fk.reshape(-1, 4)
     task_body_rot = torch_utils.quat_to_tan_norm(task_body_rot).reshape(1, 1, -1)
     
-    # root_vel[0, 0, 0] = 0.0
+    # root_vel[0, 0, 0] = 0.6
     # task_body_pos[..., 0] = task_body_pos[..., 0] + 0.1
     # task_body_pos[..., 1] = task_body_pos[..., 1] + 0.1
     # task_body_pos[..., 2] = task_body_pos[..., 2] + 0.1
@@ -114,8 +102,14 @@ def main(args, static_mimic_obs):
         for t_step in range(num_steps):
             t0 = time.time()
             
-            # Build a mimic obs from the motion library
-            mimic_obs = static_mimic_obs
+            # Build a mimic obs from the static reference and add a periodic x-offset
+            # to the right hand (local frame).
+            mimic_obs = static_mimic_obs.copy()
+            time_sec = t_step * control_dt
+            pos_start = 1 + 2 + 1  # root_z + root_vel_xy + root_ang_vel_yaw
+            right_pos_x_idx = pos_start + 3  # left hand(3) then right hand x
+            x_offset = 0.10 * np.sin(2.0 * np.pi * time_sec / 2.0)
+            mimic_obs[right_pos_x_idx] += x_offset
 
             # Convert to JSON (list) to put into Redis
             mimic_obs_list = mimic_obs.tolist() if mimic_obs.ndim == 1 else mimic_obs.flatten().tolist()

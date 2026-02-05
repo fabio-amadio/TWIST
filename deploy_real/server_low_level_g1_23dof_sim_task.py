@@ -49,16 +49,8 @@ def draw_root_velocity(mujoco_model, mujoco_data, mujoco_viewer, tgt_root_vel, i
 #   - feeds into policy
 #   - runs the sim
 # -------------------------------------------------------------------
-def aggregate_wrist_dof_pos(body_dof_pos, wrist_dof_pos):
-    total_degrees = 25
-    wrist_ids = [19, 24]
-    other_ids = [f for f in range(total_degrees) if f not in wrist_ids]
-    whole_body_pd_target = np.zeros(total_degrees)
-    whole_body_pd_target[other_ids] = body_dof_pos
-    whole_body_pd_target[wrist_ids] = wrist_dof_pos
-    
-    return whole_body_pd_target
-    
+
+
 class RealTimePolicyController:
     def __init__(self, 
                  xml_file, 
@@ -119,40 +111,40 @@ class RealTimePolicyController:
         self.default_dof_pos = np.array([
                 -0.2, 0.0, 0.0, 0.4, -0.2, 0.0,  # left leg (6)
                 -0.2, 0.0, 0.0, 0.4, -0.2, 0.0,  # right leg (6)
-                0.0, 0.0, 0.0, # torso (1)
-                0.0, 0.4, 0.0, 1.2,
-                0.0, -0.4, 0.0, 1.2,
+                0.0, 0.0, 0.0,  # torso (1)
+                0.0, 0.4, 0.0, 1.2,  # left arm (4)
+                0.0, -0.4, 0.0, 1.2,  # right arm (4)
             ])
         self.mujoco_default_dof_pos = np.concatenate([
             np.array([0, 0, 0.793]),
             np.array([0, 0, 0, 1]),
              np.array([-0.2, 0.0, 0.0, 0.4, -0.2, 0.0,  # left leg (6)
                 -0.2, 0.0, 0.0, 0.4, -0.2, 0.0,  # right leg (6)
-                0.0, 0.0, 0.0, # torso (1)
-                0.0, 0.2, 0.0, 1.2, 0.0, # left arm (4)
-                0.0, -0.2, 0.0, 1.2, 0.0, # right arm (4)
+                0.0, 0.0, 0.0,  # torso (1)
+                0.0, 0.2, 0.0, 1.2,  # left arm (4)
+                0.0, -0.2, 0.0, 1.2,  # right arm (4)
                 ])
         ])
         self.stiffness = np.array([
                 100, 100, 100, 150, 40, 40,
                 100, 100, 100, 150, 40, 40,
                 150, 150, 150,
-                40, 40, 40, 40, 20,
-                40, 40, 40, 40, 20,
+                40, 40, 40, 40,
+                40, 40, 40, 40,
             ])
         self.damping = np.array([
                 2, 2, 2, 4, 2, 2,
                 2, 2, 2, 4, 2, 2,
                 4, 4, 4,
-                5, 5, 5, 5, 1,
-                5, 5, 5, 5, 1,
+                5, 5, 5, 5,
+                5, 5, 5, 5,
             ])
         self.torque_limits = np.array([
                 88, 139, 88, 139, 50, 50,
                 88, 139, 88, 139, 50, 50,
                 88, 50, 50,
-                25, 25, 25, 25, 25,
-                25, 25, 25, 25, 25,
+                25, 25, 25, 25,
+                25, 25, 25, 25,
             ])
         
         self.action_scale = 0.5
@@ -171,32 +163,22 @@ class RealTimePolicyController:
             self.proprio_history_buf.append(np.zeros(self.n_obs_single))
 
         self.record_video = record_video
+        self.task_body_names = ["left_rubber_hand", "right_rubber_hand"]
+        self.task_body_ids = [self.model.body(name).id for name in self.task_body_names]
+        self.task_body_print_every = self.sim_decimation * 10
+        self.root_body_name = "pelvis"
+        self.root_body_id = self.model.body(self.root_body_name).id
 
     def extract_data(self):
         qpos = self.data.qpos.astype(np.float32)
         qvel = self.data.qvel.astype(np.float32)
         
-        body_ids = [0,1,2,3,4,5,
-                    6,7,8,9,10,11,
-                    12,13,14,
-                    15,16,17,18,# 19
-                    20,21,22,23, # 24
-                    ]
-        wrist_ids = [19, 24]
-        
         whole_body_dof = qpos[7:]
         whole_body_dof_vel = qvel[6:]
-        body_dof_pos = qpos[[f+7 for f in body_ids]]
-        body_dof_vel = qvel[[f+6 for f in body_ids]]
-        # wrist_dof_pos = qpos[[f+7 for f in wrist_ids]]
-        # wrist_dof_vel = qvel[[f+6 for f in wrist_ids]]
-        wrist_dof_pos = 0.0
-        wrist_dof_vel = 0.0
-        # But wrist joints still move! (use 23 dof version)
 
         quat = self.data.sensor('orientation').data.astype(np.float32)
         ang_vel = self.data.sensor('angular-velocity').data.astype(np.float32)
-        return whole_body_dof, whole_body_dof_vel, body_dof_pos, body_dof_vel, wrist_dof_pos, wrist_dof_vel, quat, ang_vel
+        return whole_body_dof, whole_body_dof_vel, quat, ang_vel
 
     def reset_sim(self):
         mujoco.mj_resetData(self.model, self.data)
@@ -231,24 +213,25 @@ class RealTimePolicyController:
             for i in pbar:
                 
                 t_start = time.time()
-                whole_body_dof, whole_body_dof_vel, body_dof_pos, body_dof_vel, wrist_dof_pos, wrist_dof_vel, quat, ang_vel = self.extract_data()
-                
+                whole_body_dof, whole_body_dof_vel, quat, ang_vel = self.extract_data()
                 if i % self.sim_decimation == 0:
                     
                     # Build a "proprio" vector for your policy, e.g.:
                     rpy = quatToEuler(quat)
-                    obs_body_dof_vel = body_dof_vel.copy()
+                    obs_body_dof_vel = whole_body_dof_vel.copy()
                     obs_body_dof_vel[self.ankle_idx] = 0.
                     obs_proprio = np.concatenate([
                         ang_vel * 0.25,
                         rpy[:2],
-                        (body_dof_pos - self.default_dof_pos),
+                        (whole_body_dof - self.default_dof_pos),
                         obs_body_dof_vel * 0.05,
                         self.last_action
                     ])
+                    
                     # send proprio to redis
                     self.redis_client.set("state_body_g1", json.dumps(obs_proprio.tolist()))
                     self.redis_client.set("state_hand_g1", json.dumps(np.zeros(14).tolist()))
+                    
 
                     # Try to get the latest mimic obs from Redis
                     try:
@@ -260,7 +243,8 @@ class RealTimePolicyController:
                             raise Exception("cannot get action mimic from redis")
                     except:
                         raise Exception("cannot get action mimic from redis")
-
+                        
+                    
                     obs_full = np.concatenate([action_mimic, obs_proprio])
                     obs_hist = np.array(self.proprio_history_buf).flatten()
                     obs_buf = np.concatenate([obs_full, obs_hist])
@@ -274,7 +258,6 @@ class RealTimePolicyController:
                     raw_action = np.clip(raw_action, -self.action_clip, self.action_clip)
                     scaled_actions = raw_action * self.action_scale
                     pd_target = scaled_actions + self.default_dof_pos
-                    pd_target = aggregate_wrist_dof_pos(pd_target, wrist_dof_pos)
                     # debug draw velocity arrow if you want
                     self.viewer.user_scn.ngeom = 0
                     draw_root_velocity(self.model, self.data, self.viewer, [0,0,0], 0, "pelvis", [1,0,0,1])
@@ -324,7 +307,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     HERE = os.path.dirname(os.path.abspath(__file__))
     
-    parser.add_argument("--xml_file", default=os.path.join(HERE, "../assets/g1/g1_sim2sim_with_wrist_roll.xml"), help="Mujoco XML file")
+    parser.add_argument("--xml_file", default=os.path.join(HERE, "../assets/g1/g1_sim2sim.xml"), help="Mujoco XML file")
     
     parser.add_argument("--policy_path",  help="Path to the policy",
                         default="../assets/twist_general_motion_tracker.pt"
