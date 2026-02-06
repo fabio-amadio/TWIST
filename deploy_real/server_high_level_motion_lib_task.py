@@ -17,9 +17,9 @@ from isaacgym.torch_utils import quat_mul
 from pose.utils.motion_lib_pkl import MotionLib
 from pose.utils import torch_utils
 from pose.util_funcs.kinematics_model import KinematicsModel
-from legged_gym import LEGGED_GYM_ROOT_DIR
-from data_utils.rot_utils import euler_from_quaternion, quat_rotate_inverse, quat_rotate_inverse_torch
-from legged_gym.envs.g1.task_obs_defs import TASK_MIMIC_OBS_DIM
+from data_utils.rot_utils import euler_from_quaternion, quat_rotate_inverse_torch
+from legged_gym.envs.g1.g1_specs import G1_HAND_BODIES, G1_URDF_PATH, G1_XML_PATH
+from legged_gym.envs.g1.g1_mimic_distill_task_config import G1_MIMIC_OBS_DIM
 
 # ---------------------------------------------------------------------
 # A small helper to replicate "mimic obs" logic from your code
@@ -48,6 +48,12 @@ def build_mimic_obs(
     root_pos, root_rot, root_vel, root_ang_vel, dof_pos, _, body_pos = motion_lib.calc_motion_frame(
         motion_ids, obs_motion_times
     )
+    if kinematics_model is not None and dof_pos.shape[1] != kinematics_model.num_joints:
+        raise RuntimeError(
+            "DOF count mismatch between motion data and kinematics model: "
+            f"motion dof_pos has {dof_pos.shape[1]} joints, "
+            f"kinematics model expects {kinematics_model.num_joints}."
+        )
     # Convert to euler (roll, pitch, yaw)
     roll, pitch, yaw = euler_from_quaternion(root_rot)
     roll = roll.reshape(1, -1, 1)
@@ -92,10 +98,10 @@ def build_mimic_obs(
         dim=-1,
     )[:, 0:1]
     mimic_obs_buf = mimic_obs_buf.reshape(1, -1)
-    if mimic_obs_buf.shape[1] != TASK_MIMIC_OBS_DIM:
+    if mimic_obs_buf.shape[1] != G1_MIMIC_OBS_DIM:
         raise RuntimeError(
             f"Task mimic_obs dim mismatch: got {mimic_obs_buf.shape[1]}, "
-            f"expected {TASK_MIMIC_OBS_DIM}"
+            f"expected {G1_MIMIC_OBS_DIM}"
         )
     
     return mimic_obs_buf.detach().cpu().numpy().squeeze(), root_pos.detach().cpu().numpy().squeeze(), \
@@ -225,13 +231,16 @@ if __name__ == "__main__":
     parser.add_argument("--steps", type=str,
                         default="1",
                         help="Comma-separated steps for future frames (tar_obs_steps)")
-    parser.add_argument("--task_bodies", type=str,
-                        default="left_rubber_hand,right_rubber_hand",
-                        help="Comma-separated task body names for mimic obs")
+    parser.add_argument(
+        "--task_bodies",
+        type=str,
+        default=",".join(G1_HAND_BODIES),
+        help="Comma-separated task body names for mimic obs",
+    )
     parser.add_argument(
         "--urdf",
         type=str,
-        default=f"{LEGGED_GYM_ROOT_DIR}/../assets/g1/g1_29dof_custom.urdf",
+        default=G1_URDF_PATH,
         help="URDF path for FK fallback if local_body_rot is missing",
     )
     parser.add_argument("--vis", action="store_true", help="Visualize the motion")
@@ -249,7 +258,7 @@ if __name__ == "__main__":
     HERE = os.path.dirname(os.path.abspath(__file__))
     
     if args.robot == "g1":
-        xml_file = f"{HERE}/../assets/g1/g1_29dof_rev_1_0.xml"
+        xml_file = G1_XML_PATH
         robot_base = "pelvis"
     else:
         raise ValueError(f"robot type {args.robot} not supported")

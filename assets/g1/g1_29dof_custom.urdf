@@ -1,4 +1,4 @@
-<robot name="g1_29dof_rev_1_0">
+<robot name="g1_29dof_custom">
   <material name="dark">
     <color rgba="0.2 0.2 0.2 1"/>
   </material>
@@ -237,6 +237,12 @@
     <axis xyz="1 0 0"/>
     <limit lower="-0.2618" upper="0.2618" effort="35" velocity="30"/>
   </joint>
+  <link name="left_toe_link"></link>
+  <joint name="left_toe_joint" type="fixed">
+    <origin xyz="0.12 0.0 -0.039" rpy="0 0 0"/>
+    <parent link="left_ankle_roll_link"/>
+    <child link="left_toe_link"/>
+  </joint>
   <link name="right_hip_pitch_link">
     <inertial>
       <origin xyz="0.002741 -0.047791 -0.02606" rpy="0 0 0"/>
@@ -417,6 +423,12 @@
     <axis xyz="1 0 0"/>
     <limit lower="-0.2618" upper="0.2618" effort="35" velocity="30"/>
   </joint>
+  <link name="right_toe_link"></link>
+  <joint name="right_toe_joint" type="fixed">
+    <origin xyz="0.12 0.0 -0.039" rpy="0 0 0"/>
+    <parent link="right_ankle_roll_link"/>
+    <child link="right_toe_link"/>
+  </joint>
 
   <!-- Torso -->
   <link name="waist_yaw_link">
@@ -490,6 +502,7 @@
   </joint>
 
   <!-- LOGO -->
+  <!--
   <joint name="logo_joint" type="fixed">
     <origin xyz="0.0039635 0 -0.044" rpy="0 0 0"/>
     <parent link="torso_link"/>
@@ -515,6 +528,7 @@
       </geometry>
     </collision>
   </link>
+  -->
 
   <!-- Head -->
   <link name="head_link">
@@ -557,28 +571,34 @@
     <child link="imu_in_torso"/>
   </joint>
 
+  <!--
   <link name="imu_in_pelvis"></link>
   <joint name="imu_in_pelvis_joint" type="fixed">
     <origin xyz="0.04525 0 -0.08339" rpy="0 0 0"/>
     <parent link="pelvis"/>
     <child link="imu_in_pelvis"/>
   </joint>
+  -->
 
   <!-- d435 -->
+  <!--
   <link name="d435_link"></link>
   <joint name="d435_joint" type="fixed">
     <origin xyz="0.0576235 0.01753 0.42987" rpy="0 0.8307767239493009 0"/>
     <parent link="torso_link"/>
     <child link="d435_link"/>
   </joint>
+  -->
 
   <!-- mid360 -->
+  <!--
   <link name="mid360_link"></link>
   <joint name="mid360_joint" type="fixed">
     <origin xyz="0.0002835 0.00003 0.41618" rpy="0 0.04014257279586953 0"/>
     <parent link="torso_link"/>
     <child link="mid360_link"/>
   </joint>
+  -->  
 
   <!-- Arm -->
   <link name="left_shoulder_pitch_link">

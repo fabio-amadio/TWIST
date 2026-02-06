@@ -61,13 +61,9 @@ class HumanoidChar(LeggedRobot):
         self._ref_body_pos = torch.zeros_like(self.rigid_body_states[..., :3])
         self.feet_force_sum = torch.ones(self.num_envs, 2, device=self.device)
         key_bodies = self.cfg.motion.key_bodies
-        upper_key_bodies = self.cfg.motion.upper_key_bodies
         self._key_body_ids = self._build_body_ids_tensor(key_bodies)
-        self._upper_key_body_ids = self._build_body_ids_tensor(upper_key_bodies)
         cprint(f"[HumanoidChar] key_bodies ids: {self._key_body_ids}", "green")
         cprint(f"[HumanoidChar] num of key bodies: {len(self._key_body_ids)}", "green")
-        cprint(f"[HumanoidChar] upper_key_bodies ids: {self._upper_key_body_ids}", "green")
-        cprint(f"[HumanoidChar] num of upper key bodies: {len(self._upper_key_body_ids)}", "green")
         self.init_yaw = torch.zeros(self.num_envs, device=self.device)
 
     def _create_envs(self):
@@ -423,18 +419,6 @@ class HumanoidChar(LeggedRobot):
                 pose = gymapi.Transform(gymapi.Vec3(ref_key_body_pos_global[id, i, 0], ref_key_body_pos_global[id, i, 1], ref_key_body_pos_global[id, i, 2]), r=None)
                 gymutil.draw_lines(geom, self.gym, self.viewer, self.envs[id], pose)
         
-        # # draw local upper key bodies
-        # geom = gymutil.WireframeSphereGeometry(0.04, 32, 32, None, color=(0, 0, 1))
-        # upper_key_body_pos = self._ref_body_pos[:, self._upper_key_body_ids, :3] - self._ref_root_pos[:, None, :]
-        # upper_key_body_pos_local = convert_to_local_root_body_pos(self._ref_root_rot, upper_key_body_pos)
-        # draw_root_pos = self.root_states[:, :3].clone()
-        # draw_root_pos[:, 2] = self._ref_root_pos[:, 2]
-        # upper_key_body_pos_global = convert_to_global_root_body_pos(root_pos=draw_root_pos, root_rot=self.root_states[:, 3:7], body_pos=upper_key_body_pos_local)
-        # for id in range(self.num_envs):
-        #     for i in range(upper_key_body_pos.shape[1]):
-        #         pose = gymapi.Transform(gymapi.Vec3(upper_key_body_pos_global[id, i, 0], upper_key_body_pos_global[id, i, 1], upper_key_body_pos_global[id, i, 2]), r=None)
-        #         gymutil.draw_lines(geom, self.gym, self.viewer, self.envs[id], pose)
-
         # draw global whole body
         draw_gloabl = True
         if draw_gloabl:

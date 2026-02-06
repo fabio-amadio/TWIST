@@ -5,7 +5,7 @@ sys.path.append("../../../rsl_rl")
 import torch
 import torch.nn as nn
 from rsl_rl.modules.actor_critic_mimic import Actor, get_activation
-from legged_gym.envs.g1.task_obs_defs import TASK_MIMIC_OBS_DIM
+from legged_gym.envs.g1.g1_mimic_distill_task_config import G1_MIMIC_OBS_DIM
 import argparse
 from termcolor import cprint
 
@@ -93,7 +93,7 @@ def play(args):
     if args.robot == "g1":
         num_actions = 23
         n_proprio = 3 + 2 + 3 * num_actions
-        n_mimic_obs = TASK_MIMIC_OBS_DIM
+        n_mimic_obs = G1_MIMIC_OBS_DIM
         n_obs_single = n_mimic_obs + n_proprio
         num_observations = n_obs_single * (history_len + 1)
     elif args.robot == "t1":

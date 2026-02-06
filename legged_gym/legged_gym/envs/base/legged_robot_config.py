@@ -247,9 +247,9 @@ class LeggedRobotCfg(BaseConfig):
     class asset:
         file = ""
         xml_file = ""
-        foot_name = "None" # name of the feet bodies, used to index body state and contact force tensors
-        waist_name = "None" # name of the waist body, used to index body state and contact force tensors
-        hand_name = "None" # name of the hand bodies, used to index body state and contact force tensors
+        torso_name = None
+        feet_bodies = []
+        hand_bodies = []
         penalize_contacts_on = []
         terminate_after_contacts_on = []
         disable_gravity = False

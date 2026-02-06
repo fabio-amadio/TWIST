@@ -77,6 +77,32 @@ class HumanoidMimic(HumanoidChar):
         self._ref_body_pos = torch.zeros_like(self.rigid_body_states[..., 0:3])
         self._ref_dof_pos = torch.zeros_like(self.dof_pos)
         self._ref_dof_vel = torch.zeros_like(self.dof_vel)
+
+        motion_body_names = self._motion_lib.get_body_link_list()
+        sim_body_names = list(self.body_names)
+        if len(motion_body_names) != len(sim_body_names):
+            motion_set = set(motion_body_names)
+            sim_set = set(sim_body_names)
+            missing_in_motion = [name for name in sim_body_names if name not in motion_set]
+            extra_in_motion = [name for name in motion_body_names if name not in sim_set]
+            raise ValueError(
+                "Motion/URDF body count mismatch: "
+                f"motion={len(motion_body_names)} vs urdf={len(sim_body_names)}. "
+                f"Missing in motion: {missing_in_motion}. "
+                f"Extra in motion: {extra_in_motion}."
+            )
+        if motion_body_names != sim_body_names:
+            mismatches = []
+            for i, (motion_name, sim_name) in enumerate(zip(motion_body_names, sim_body_names)):
+                if motion_name != sim_name:
+                    mismatches.append((i, motion_name, sim_name))
+                if len(mismatches) >= 10:
+                    break
+            raise ValueError(
+                "Motion/URDF body name order mismatch. The pipeline assumes the exact same "
+                "body name order between motion data and the URDF. "
+                f"First mismatches (index, motion, urdf): {mismatches}"
+            )
         
         self._dof_err_w = self.cfg.env.dof_err_w
         if self._dof_err_w is None:

@@ -270,4 +270,7 @@ class MotionLib:
     
     def get_motion_names(self):
         return self._motion_names
+
+    def get_body_link_list(self):
+        return list(self._body_link_list)
         

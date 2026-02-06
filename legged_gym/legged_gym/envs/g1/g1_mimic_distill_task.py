@@ -7,10 +7,7 @@ from isaacgym.torch_utils import (
 import torch
 
 from legged_gym.envs.base.humanoid_mimic import HumanoidMimic
-from .g1_mimic_distill_task_config import (
-    G1MimicDistillTaskPrivCfg,
-    G1MimicDistillTaskStuCfg,
-)
+from .g1_mimic_distill_task_config import G1MimicDistillTaskPrivCfg
 from pose.utils import torch_utils
 from legged_gym.envs.base.legged_robot import euler_from_quaternion
 from legged_gym.envs.base.humanoid_char import (
@@ -18,87 +15,7 @@ from legged_gym.envs.base.humanoid_char import (
     convert_to_global_root_body_pos,
 )
 from pose.util_funcs.kinematics_model import KinematicsModel
-
-
-def g1_body_from_38_to_52(body_pos_38: torch.Tensor) -> torch.Tensor:
-    """
-    Convert joint positions from shape (N, 38, 3) to shape (N, 52, 3).
-    Extra joints (e.g., fingers) are filled with (0, 0, 0).
-
-    Args:
-        body_pos_38 (torch.Tensor): Joint positions of shape (N, 38, 3),
-            where N is batch size.
-
-    Returns:
-        torch.Tensor: Joint positions of shape (N, 52, 3).
-    """
-
-    # Build an index map of size 52:
-    # "Which 38-link index corresponds to each 52-link joint?"
-    # Unmapped joints (e.g., fingers) are set to -1.
-    idx_map_52_list = [-1] * 52
-    # Explicit 38->52 mapping:
-    # 0~29 unchanged,
-    # 30->37, 31->38, 32->39, 33->40, 34->41, 35->42, 36->43, 37->44
-    # ---------------------------------------------------------------------
-    idx_map_52_list[0] = 0  # pelvis
-    idx_map_52_list[1] = 1
-    idx_map_52_list[2] = 2
-    idx_map_52_list[3] = 3
-    idx_map_52_list[4] = 4
-    idx_map_52_list[5] = 5
-    idx_map_52_list[6] = 6
-    idx_map_52_list[7] = 7
-    idx_map_52_list[8] = 8
-    idx_map_52_list[9] = 9
-    idx_map_52_list[10] = 10
-    idx_map_52_list[11] = 11
-    idx_map_52_list[12] = 12
-    idx_map_52_list[13] = 13
-    idx_map_52_list[14] = 14
-    idx_map_52_list[15] = 15
-    idx_map_52_list[16] = 16
-    idx_map_52_list[17] = 17
-    idx_map_52_list[18] = 18
-    idx_map_52_list[19] = 19
-    idx_map_52_list[20] = 20
-    idx_map_52_list[21] = 21
-    idx_map_52_list[22] = 22
-    idx_map_52_list[23] = 23
-    idx_map_52_list[24] = 24
-    idx_map_52_list[25] = 25
-    idx_map_52_list[26] = 26
-    idx_map_52_list[27] = 27
-    idx_map_52_list[28] = 28
-    idx_map_52_list[29] = 29
-    idx_map_52_list[37] = 30
-    idx_map_52_list[38] = 31
-    idx_map_52_list[39] = 32
-    idx_map_52_list[40] = 33
-    idx_map_52_list[41] = 34
-    idx_map_52_list[42] = 35
-    idx_map_52_list[43] = 36
-    idx_map_52_list[44] = 37
-    # Remaining indices (finger joints) stay as -1.
-
-    # Convert to a PyTorch tensor on the same device as input.
-    idx_map_52 = torch.tensor(
-        idx_map_52_list, dtype=torch.long, device=body_pos_38.device
-    )
-
-    # Create output tensor of shape (N, 52, 3), initialized to zeros.
-    N = body_pos_38.shape[0]
-    body_pos_52 = torch.zeros(
-        (N, 52, 3), dtype=body_pos_38.dtype, device=body_pos_38.device
-    )
-
-    # Build a boolean mask for joints where idx_map_52 >= 0.
-    valid_mask = idx_map_52 >= 0
-
-    # Copy valid joints via advanced indexing (no batch loop).
-    body_pos_52[:, valid_mask, :] = body_pos_38[:, idx_map_52[valid_mask], :]
-
-    return body_pos_52
+from legged_gym.envs.g1.g1_specs import G1_ANKLE_DOF_IDX, G1_WAIST_DOF_IDX
 
 
 class G1MimicDistillTask(HumanoidMimic):
@@ -156,8 +73,11 @@ class G1MimicDistillTask(HumanoidMimic):
         self._ref_root_ang_vel[env_ids] = root_ang_vel
         self._ref_dof_pos[env_ids] = dof_pos
         self._ref_dof_vel[env_ids] = dof_vel
-        if body_pos.shape[1] != self._ref_body_pos[env_ids].shape[1]:
-            body_pos = g1_body_from_38_to_52(body_pos)
+        if body_pos.shape[1] != self._ref_body_pos.shape[1]:
+            raise ValueError(
+                "Motion/URDF body count mismatch at runtime: "
+                f"motion={body_pos.shape[1]} vs urdf={self._ref_body_pos.shape[1]}."
+            )
         self._ref_body_pos[env_ids] = convert_to_global_root_body_pos(
             root_pos=root_pos, root_rot=root_rot, body_pos=body_pos
         )
@@ -184,7 +104,10 @@ class G1MimicDistillTask(HumanoidMimic):
         self._ref_dof_pos[:] = dof_pos
         self._ref_dof_vel[:] = dof_vel
         if body_pos.shape[1] != self._ref_body_pos.shape[1]:
-            body_pos = g1_body_from_38_to_52(body_pos)
+            raise ValueError(
+                "Motion/URDF body count mismatch at runtime: "
+                f"motion={body_pos.shape[1]} vs urdf={self._ref_body_pos.shape[1]}."
+            )
         self._ref_body_pos[:] = convert_to_global_root_body_pos(
             root_pos=root_pos, root_rot=root_rot, body_pos=body_pos
         )
@@ -198,60 +121,6 @@ class G1MimicDistillTask(HumanoidMimic):
             )  # currently we use the same strategy for student
         else:
             return
-
-    def _get_body_indices(self):
-        upper_arm_names = [
-            s for s in self.body_names if self.cfg.asset.upper_arm_name in s
-        ]
-        lower_arm_names = [
-            s for s in self.body_names if self.cfg.asset.lower_arm_name in s
-        ]
-        torso_name = [
-            s for s in self.body_names if self.cfg.asset.torso_name in s
-        ]
-        self.torso_indices = torch.zeros(
-            len(torso_name),
-            dtype=torch.long,
-            device=self.device,
-            requires_grad=False,
-        )
-        for j in range(len(torso_name)):
-            self.torso_indices[j] = self.gym.find_actor_rigid_body_handle(
-                self.envs[0], self.actor_handles[0], torso_name[j]
-            )
-        self.upper_arm_indices = torch.zeros(
-            len(upper_arm_names),
-            dtype=torch.long,
-            device=self.device,
-            requires_grad=False,
-        )
-        for j in range(len(upper_arm_names)):
-            self.upper_arm_indices[j] = self.gym.find_actor_rigid_body_handle(
-                self.envs[0], self.actor_handles[0], upper_arm_names[j]
-            )
-        self.lower_arm_indices = torch.zeros(
-            len(lower_arm_names),
-            dtype=torch.long,
-            device=self.device,
-            requires_grad=False,
-        )
-        for j in range(len(lower_arm_names)):
-            self.lower_arm_indices[j] = self.gym.find_actor_rigid_body_handle(
-                self.envs[0], self.actor_handles[0], lower_arm_names[j]
-            )
-        knee_names = [
-            s for s in self.body_names if self.cfg.asset.shank_name in s
-        ]
-        self.knee_indices = torch.zeros(
-            len(knee_names),
-            dtype=torch.long,
-            device=self.device,
-            requires_grad=False,
-        )
-        for i in range(len(knee_names)):
-            self.knee_indices[i] = self.gym.find_actor_rigid_body_handle(
-                self.envs[0], self.actor_handles[0], knee_names[i]
-            )
 
     def _init_buffers(self):
         super()._init_buffers()
@@ -419,23 +288,7 @@ class G1MimicDistillTask(HumanoidMimic):
             dim=-1,
         )
 
-        # # shape: (num_envs, 1, 1+3+2+1+3*num_task_bodies+6*num_task_bodies)
-        # # student v0
-        # mimic_obs_buf = torch.cat(
-        #     (
-        #         root_pos[..., 2:3],  # 1 dim
-        #         roll,
-        #         pitch,
-        #         yaw,  # 3 dims
-        #         root_vel[..., 0:2],  # 2 dims, x, y only
-        #         root_ang_vel[..., 2:3],  # 1 dim, yaw only
-        #         task_body_pos,  # num_task_bodies * 3 dims
-        #         task_body_rot,  # num_task_bodies * 6 dims
-        #     ),
-        #     dim=-1,
-        # )[:, 0:1]
         # shape: (num_envs, 1, 1+2+1+3*num_task_bodies+6*num_task_bodies)
-        # student v1
         mimic_obs_buf = torch.cat(
             (
                 root_pos[..., 2:3],  # 1 dim
@@ -494,8 +347,7 @@ class G1MimicDistillTask(HumanoidMimic):
         dof_vel_start_dim = 5 + self.dof_pos.shape[1]
 
         # disable ankle dof
-        ankle_idx = [4, 5, 10, 11]
-        proprio_obs_buf[:, [dof_vel_start_dim + i for i in ankle_idx]] = 0.0
+        proprio_obs_buf[:, [dof_vel_start_dim + i for i in G1_ANKLE_DOF_IDX]] = 0.0
 
         key_body_pos = self.rigid_body_states[:, self._key_body_ids, :3]
         key_body_pos = key_body_pos - self.root_states[:, None, :3]
@@ -669,7 +521,7 @@ class G1MimicDistillTask(HumanoidMimic):
         return torch.exp(-5.0 * rot_err)
 
     def _reward_waist_dof_acc(self):
-        waist_dof_idx = [13, 14]
+        waist_dof_idx = G1_WAIST_DOF_IDX
         return torch.sum(
             torch.square((self.last_dof_vel - self.dof_vel) / self.dt)[
                 :, waist_dof_idx
@@ -678,11 +530,11 @@ class G1MimicDistillTask(HumanoidMimic):
         )
 
     def _reward_waist_dof_vel(self):
-        waist_dof_idx = [13, 14]
+        waist_dof_idx = G1_WAIST_DOF_IDX
         return torch.sum(torch.square(self.dof_vel[:, waist_dof_idx]), dim=1)
 
     def _reward_ankle_dof_acc(self):
-        ankle_dof_idx = [4, 5, 10, 11]
+        ankle_dof_idx = G1_ANKLE_DOF_IDX
         return torch.sum(
             torch.square((self.last_dof_vel - self.dof_vel) / self.dt)[
                 :, ankle_dof_idx
@@ -691,7 +543,7 @@ class G1MimicDistillTask(HumanoidMimic):
         )
 
     def _reward_ankle_dof_vel(self):
-        ankle_dof_idx = [4, 5, 10, 11]
+        ankle_dof_idx = G1_ANKLE_DOF_IDX
         return torch.sum(torch.square(self.dof_vel[:, ankle_dof_idx]), dim=1)
 
     def _reward_ankle_action(self):

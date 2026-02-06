@@ -148,7 +148,6 @@ class HumanoidCharCfg(BaseConfig):
     class asset:
         file = ""
         xml_file = ""
-        foot_name = "None" # name of the feet bodies, used to index body state and contact force tensors
         penalize_contacts_on = []
         terminate_after_contacts_on = []
         disable_gravity = False
@@ -293,7 +292,6 @@ class HumanoidCharCfg(BaseConfig):
         motion_curriculum = False
         motion_curriculum_gamma = 0.001
         key_bodies = []
-        upper_key_bodies = []
         motion_file = ""
         height_offset = 0.0
         reset_consec_frames = 50

@@ -10,7 +10,7 @@ from rich import print
 from collections import deque
 import mujoco.viewer as mjv
 from tqdm import tqdm
-from legged_gym.envs.g1.task_obs_defs import TASK_MIMIC_OBS_DIM
+from legged_gym.envs.g1.g1_mimic_distill_task_config import G1_MIMIC_OBS_DIM
 import os
 from data_utils.rot_utils import quatToEuler
 
@@ -163,7 +163,7 @@ class RealTimePolicyController:
         self.ankle_idx = [4, 5, 10, 11]
         
         # For multi-step history
-        self.n_mimic_obs = TASK_MIMIC_OBS_DIM
+        self.n_mimic_obs = G1_MIMIC_OBS_DIM
         self.n_proprio = 3 + 2 + 3 * self.num_actions
         self.n_obs_single = self.n_mimic_obs + self.n_proprio
         self.proprio_history_buf = deque(maxlen=10)

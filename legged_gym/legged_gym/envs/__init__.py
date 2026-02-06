@@ -34,11 +34,6 @@ from .base.legged_robot import LeggedRobot
 from .base.humanoid import Humanoid
 from .base.humanoid_view_motion import HumanoidViewMotion
 from .base.humanoid_mimic import HumanoidMimic
-
-
-from .g1.g1_mimic_distill import G1MimicDistill
-from .g1.g1_mimic_distill_config import G1MimicPrivCfg, G1MimicPrivCfgPPO
-from .g1.g1_mimic_distill_config import G1MimicStuRLCfg, G1MimicStuRLCfgDAgger
 from .g1.g1_mimic_distill_task import G1MimicDistillTask
 from .g1.g1_mimic_distill_task_config import (
     G1MimicDistillTaskPrivCfg,
@@ -50,10 +45,6 @@ from .g1.g1_mimic_distill_task_config import (
 from legged_gym.gym_utils.task_registry import task_registry
 
 # ======================= environment registration =======================
-
-task_registry.register("g1_priv_mimic", G1MimicDistill, G1MimicPrivCfg(), G1MimicPrivCfgPPO())
-
-task_registry.register("g1_stu_rl", G1MimicDistill, G1MimicStuRLCfg(), G1MimicStuRLCfgDAgger())
 
 task_registry.register(
     "g1_priv_mimic_task",

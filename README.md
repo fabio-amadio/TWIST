@@ -118,22 +118,22 @@ bash to_jit.sh 0927_twist_rlbcstu
 
 You should see something like this:
 ```bash
-Saved traced_actor at /home/yanjieze/projects/g1_wbc/TWIST-clean/legged_gym/logs/g1_stu_rl/0927_twist_rlbcstu/traced/0927_twist_rlbcstu-47500-jit.pt
+Saved traced_actor at /path/to/TWIST/legged_gym/logs/g1_stu_rl_task/0927_twist_rlbcstu/traced/0927_twist_rlbcstu-47500-jit.pt
 Robot: g1
 ```
 
-**4**. Sim2sim verification:
+**4**. Sim2sim verification (task-based pipeline):
 
 [If this is your first time to run this script] you need to warm up the redis server by running the high-level motion server.
 ```bash
 cd deploy_real
-python server_high_level_motion_lib.py --motion_file PATH/TO/YOUR/MOTION/FILE
+python server_high_level_motion_lib_task.py --motion_file PATH/TO/YOUR/MOTION/FILE
 ```
 You can just select one motion file from our motion dataset.
 
 Then, you can run the low-level simulation server.
 ```bash
-python server_low_level_g1_sim.py --policy_path PATH/TO/YOUR/JIT/MODEL
+python server_low_level_g1_sim_task.py --policy_path PATH/TO/YOUR/JIT/MODEL
 ```
 - This will start a simulation that runs the low-level controller only.
 - This is because we separate the high-level control (i.e., teleop) from the low-level control (i.e., RL policy).
@@ -141,7 +141,7 @@ python server_low_level_g1_sim.py --policy_path PATH/TO/YOUR/JIT/MODEL
 
 And now you can control the robot via high-level motion server.
 ```bash
-python server_high_level_motion_lib.py --motion_file PATH/TO/YOUR/MOTION/FILE --vis
+python server_high_level_motion_lib_task.py --motion_file PATH/TO/YOUR/MOTION/FILE --vis
 ```
 
 
@@ -150,26 +150,7 @@ python server_high_level_motion_lib.py --motion_file PATH/TO/YOUR/MOTION/FILE --
 
 **5**. Sim2real verification. If you are not familiar with the deployment on physical robot, you can refer to [unitree_g1.md](./unitree_g1.md) or [unitree_g1.zh.md](./unitree_g1.zh.md) for more details.
 
-More specifically, the pipeline for sim2real deploy is:
-1. start the robot and connect the robot and your laptop via an Ethernet cable.
-2. config the corresponding net interface on your laptop, by setting the IP address as `192.168.123.222` and the netmask as `255.255.255.0`.
-3. now you should be able to ping the robot via `ping 192.168.123.164`.
-4. then use Unitree G1's remote control to enter dev mode, i.e., press the `L2+R2` key combination.
-5. now you should be able to see the robot joints in the damping state.
-6. then you can run the low-level controller by:
-```bash
-cd deploy_real
-python server_low_level_g1_real.py --policy_path PATH/TO/YOUR/JIT/MODEL --net YOUR_NET_INTERFACE_TO_UNITREE_ROBOT
-```
-
-
-
-
-
-Similarly, you run the low-level controller first and then control the robot via high-level motion server.
-```bash
-python server_high_level_motion_lib.py --motion_file PATH/TO/YOUR/MOTION/FILE --vis
-```
+This repository now focuses on the task-based pipeline; the older non-task sim2real scripts were removed. If you need real-robot deployment, adapt the task-based servers accordingly.
 
 **6**. Real-time teleop. We provide a legacy version we use in May 2025 here: `deploy_real/server_motion_optitrack_v2 (legacy).py`. 
 - As later we have upgraded to use [GMR](https://github.com/YanjieZe/GMR) for real-time teleop, you can first check [GMR](https://github.com/YanjieZe/GMR) for real-time motion retargeting. After you can successfully run GMR with your MoCap, it would be very easy to modify our provided script to your setting.

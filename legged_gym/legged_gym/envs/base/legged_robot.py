@@ -836,11 +836,17 @@ class LeggedRobot(BaseTask):
         self.dof_names = self.gym.get_asset_dof_names(robot_asset)
         self.num_bodies = len(body_names)
         self.num_dofs = len(self.dof_names)
-        feet_names = [s for s in body_names if self.cfg.asset.foot_name in s]
-        self.torso_idx = self.gym.find_asset_rigid_body_index(robot_asset, self.cfg.asset.torso_name)
-        self.chest_idx = self.gym.find_asset_rigid_body_index(robot_asset, self.cfg.asset.chest_name)
+        if not hasattr(self.cfg.asset, "feet_bodies") or len(self.cfg.asset.feet_bodies) == 0:
+            raise ValueError("cfg.asset.feet_bodies must be a non-empty list of body names.")
+        feet_names = list(self.cfg.asset.feet_bodies)
 
-        for s in self.cfg.asset.feet_bodies:
+        if self.cfg.asset.torso_name is None:
+            raise ValueError("cfg.asset.torso_name must be set to a valid body name.")
+        self.torso_idx = self.gym.find_asset_rigid_body_index(
+            robot_asset, self.cfg.asset.torso_name
+        )
+
+        for s in feet_names:
             feet_idx = self.gym.find_asset_rigid_body_index(robot_asset, s)
             sensor_pose = gymapi.Transform(gymapi.Vec3(0.0, 0.0, 0.0))
             self.gym.create_asset_force_sensor(robot_asset, feet_idx, sensor_pose)
@@ -903,17 +909,18 @@ class LeggedRobot(BaseTask):
         self.body_names = body_names
         self._get_body_indices()
 
-        self.feet_indices = torch.zeros(len(feet_names), dtype=torch.long, device=self.device, requires_grad=False)
+        self.feet_indices = torch.zeros(
+            len(feet_names), dtype=torch.long, device=self.device, requires_grad=False
+        )
         for i in range(len(feet_names)):
-            self.feet_indices[i] = self.gym.find_actor_rigid_body_handle(self.envs[0], self.actor_handles[0], feet_names[i])
+            self.feet_indices[i] = self.gym.find_actor_rigid_body_handle(
+                self.envs[0], self.actor_handles[0], feet_names[i]
+            )
         
         
-        waist_names = self.cfg.asset.waist_name
-        self.waist_indices = torch.zeros(len(waist_names), dtype=torch.long, device=self.device, requires_grad=False)
-        for j in range(len(waist_names)):
-            self.waist_indices[j] = self.gym.find_actor_rigid_body_handle(self.envs[0], self.actor_handles[0], waist_names[j])
+        self.waist_indices = torch.zeros(0, dtype=torch.long, device=self.device, requires_grad=False)
         
-        hand_names = self.cfg.asset.hand_name
+        hand_names = list(self.cfg.asset.hand_bodies) if hasattr(self.cfg.asset, "hand_bodies") else []
         self.hand_indices = torch.zeros(len(hand_names), dtype=torch.long, device=self.device, requires_grad=False)
         for i in range(len(hand_names)):
             self.hand_indices[i] = self.gym.find_actor_rigid_body_handle(self.envs[0], self.actor_handles[0], hand_names[i])

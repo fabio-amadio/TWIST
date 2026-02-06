@@ -1,10 +1,21 @@
+from legged_gym import LEGGED_GYM_ROOT_DIR
 from legged_gym.envs.base.humanoid_mimic_config import (
     HumanoidMimicCfg,
     HumanoidMimicCfgPPO,
 )
-from legged_gym import LEGGED_GYM_ROOT_DIR
-from legged_gym.envs.g1.task_obs_defs import TASK_MIMIC_OBS_DIM
-NUM_KEY_BODIES = 9
+from legged_gym.envs.g1.g1_specs import (
+    G1_NUM_DOF,
+    G1_KEY_BODIES,
+    G1_FEET_BODIES,
+    G1_HAND_BODIES,
+    G1_TORSO_NAME,
+    G1_DEFAULT_JOINT_ANGLES,
+    G1_DOF_ARMATURE,
+    G1_URDF_PATH,
+)
+
+G1_MIMIC_OBS_DIM: int = 1 + 2 + 1 + 3 * 2 + 6 * 2
+NUM_KEY_BODIES = len(G1_KEY_BODIES)
 
 
 class G1MimicDistillTaskPrivCfg(HumanoidMimicCfg):
@@ -33,7 +44,7 @@ class G1MimicDistillTaskPrivCfg(HumanoidMimicCfg):
         ]
 
         num_envs = 4096
-        num_actions = 23
+        num_actions = G1_NUM_DOF
         obs_type = "priv"  # 'student'
         n_priv_latent = 4 + 1 + 2 * num_actions
         extra_critic_obs = 3
@@ -41,10 +52,10 @@ class G1MimicDistillTaskPrivCfg(HumanoidMimicCfg):
 
         n_proprio = 3 + 2 + 3 * num_actions
         # mimic obs (student):
-        n_mimic_obs = TASK_MIMIC_OBS_DIM
+        n_mimic_obs = G1_MIMIC_OBS_DIM
         # priv_mimic_obs (teacher):
         #   [root_z(1), rpy(3), root_lin_vel(3), root_ang_vel_yaw(1),
-        #    dof_pos(23), key_body_pos(3*9)]
+        #    dof_pos(29), key_body_pos(3*9)]
         n_priv_mimic_obs = len(tar_obs_steps) * (
             1 + 3 + 3 + 1 + num_actions + 3 * NUM_KEY_BODIES
         )
@@ -97,11 +108,17 @@ class G1MimicDistillTaskPrivCfg(HumanoidMimicCfg):
             0.8,
             0.8,
             0.8,
-            1.0,  # Left Arm
+            1.0,
+            0.4,
+            0.4,
+            0.4,  # Left Arm + Wrist
             0.8,
             0.8,
             0.8,
-            1.0,  # Right Arm
+            1.0,
+            0.4,
+            0.4,
+            0.4,  # Right Arm + Wrist
         ]
 
         global_obs = False
@@ -116,31 +133,7 @@ class G1MimicDistillTaskPrivCfg(HumanoidMimicCfg):
 
     class init_state(HumanoidMimicCfg.init_state):
         pos = [0, 0, 1.0]
-        default_joint_angles = {
-            "left_hip_pitch_joint": -0.2,
-            "left_hip_roll_joint": 0.0,
-            "left_hip_yaw_joint": 0.0,
-            "left_knee_joint": 0.4,
-            "left_ankle_pitch_joint": -0.2,
-            "left_ankle_roll_joint": 0.0,
-            "right_hip_pitch_joint": -0.2,
-            "right_hip_roll_joint": 0.0,
-            "right_hip_yaw_joint": 0.0,
-            "right_knee_joint": 0.4,
-            "right_ankle_pitch_joint": -0.2,
-            "right_ankle_roll_joint": 0.0,
-            "waist_yaw_joint": 0.0,
-            "waist_roll_joint": 0.0,
-            "waist_pitch_joint": 0.0,
-            "left_shoulder_pitch_joint": 0.0,
-            "left_shoulder_roll_joint": 0.4,
-            "left_shoulder_yaw_joint": 0.0,
-            "left_elbow_joint": 1.2,
-            "right_shoulder_pitch_joint": 0.0,
-            "right_shoulder_roll_joint": -0.4,
-            "right_shoulder_yaw_joint": 0.0,
-            "right_elbow_joint": 1.2,
-        }
+        default_joint_angles = G1_DEFAULT_JOINT_ANGLES
 
     class control(HumanoidMimicCfg.control):
         stiffness = {
@@ -176,24 +169,15 @@ class G1MimicDistillTaskPrivCfg(HumanoidMimicCfg):
         clip_actions = 5.0
 
     class asset(HumanoidMimicCfg.asset):
-        # file = f'{LEGGED_GYM_ROOT_DIR}/../assets/g1/g1_custom_collision.urdf'
-        file = f"{LEGGED_GYM_ROOT_DIR}/../assets/g1/g1_custom_collision_with_fixed_hand.urdf"
+        file = G1_URDF_PATH
 
         # for both joint and link name
-        torso_name: str = "pelvis"  # humanoid pelvis part
-        chest_name: str = "imu_in_torso"  # humanoid chest part
+        torso_name: str = G1_TORSO_NAME  # used for base mass/com randomization
 
         # for link name
-        thigh_name: str = "hip"
-        shank_name: str = "knee"
-        foot_name: str = "ankle_roll_link"  # foot_pitch is not used
-        waist_name: list = ["torso_link", "waist_roll_link", "waist_yaw_link"]
-        upper_arm_name: str = "shoulder_roll_link"
-        lower_arm_name: str = "elbow_link"
-        hand_name: list = ["right_rubber_hand", "left_rubber_hand"]
+        hand_bodies: list = G1_HAND_BODIES
 
-        feet_bodies = ["left_ankle_roll_link", "right_ankle_roll_link"]
-        n_lower_body_dofs: int = 12
+        feet_bodies = G1_FEET_BODIES
 
         penalize_contacts_on = ["shoulder", "elbow", "hip", "knee"]
         terminate_after_contacts_on = ["torso_link"]
@@ -204,11 +188,7 @@ class G1MimicDistillTaskPrivCfg(HumanoidMimicCfg):
         # knee, hip roll: 0.489 * 1e-4 * 22.5**2 + 0.109 * 1e-4 * 4.5**2 + 0.738 * 1e-4 = 0.0251
         # wrist: 0.068 * 1e-4 * 25**2 = 0.00425
 
-        dof_armature = (
-            [0.0103, 0.0251, 0.0103, 0.0251, 0.003597, 0.003597] * 2
-            + [0.0103] * 3
-            + [0.003597] * 8
-        )
+        dof_armature = G1_DOF_ARMATURE
 
         # dof_armature = [0.0, 0.0, 0.0, 0.0, 0.0, 0.001] * 2 + [0.0] * 3 + [0.0] * 8
 
@@ -345,25 +325,8 @@ class G1MimicDistillTaskPrivCfg(HumanoidMimicCfg):
     class motion(HumanoidMimicCfg.motion):
         motion_curriculum = True
         motion_curriculum_gamma = 0.01
-        key_bodies = [
-            "left_rubber_hand",
-            "right_rubber_hand",
-            "left_ankle_roll_link",
-            "right_ankle_roll_link",
-            "left_knee_link",
-            "right_knee_link",
-            "left_elbow_link",
-            "right_elbow_link",
-            "head_mocap",
-        ]  # 9 key bodies
-        upper_key_bodies = [
-            "left_rubber_hand",
-            "right_rubber_hand",
-            "left_elbow_link",
-            "right_elbow_link",
-            "head_mocap",
-        ]
-        task_bodies = ["left_rubber_hand", "right_rubber_hand"]
+        key_bodies = G1_KEY_BODIES  # 9 key bodies
+        task_bodies = G1_HAND_BODIES
 
         motion_file = (
             f"{LEGGED_GYM_ROOT_DIR}/motion_data_configs/twist_dataset.yaml"
@@ -398,14 +361,14 @@ class G1MimicDistillTaskStuCfg(G1MimicDistillTaskPrivCfg):
         ]
 
         num_envs = 4096
-        num_actions = 23
+        num_actions = G1_NUM_DOF
         obs_type = "student"
         n_priv_latent = 4 + 1 + 2 * num_actions
         extra_critic_obs = 3
         n_priv = 0
 
         n_proprio = 3 + 2 + 3 * num_actions
-        n_mimic_obs = TASK_MIMIC_OBS_DIM
+        n_mimic_obs = G1_MIMIC_OBS_DIM
         n_priv_mimic_obs = len(tar_obs_steps) * (
             1 + 3 + 3 + 1 + num_actions + 3 * NUM_KEY_BODIES
         )
@@ -449,14 +412,14 @@ class G1MimicDistillTaskStuRLCfg(G1MimicDistillTaskPrivCfg):
         ]
 
         num_envs = 4096
-        num_actions = 23
+        num_actions = G1_NUM_DOF
         obs_type = "student"
         n_priv_latent = 4 + 1 + 2 * num_actions
         extra_critic_obs = 3
         n_priv = 0
 
         n_proprio = 3 + 2 + 3 * num_actions
-        n_mimic_obs = TASK_MIMIC_OBS_DIM
+        n_mimic_obs = G1_MIMIC_OBS_DIM
         n_priv_mimic_obs = len(tar_obs_steps) * (
             1 + 3 + 3 + 1 + num_actions + 3 * NUM_KEY_BODIES
         )

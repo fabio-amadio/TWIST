@@ -11,11 +11,13 @@ import os
 # ---------------------------------------------------------------------
 # Example imports: adapt to your actual file structure
 # ---------------------------------------------------------------------
-from legged_gym.envs.g1.task_obs_defs import TASK_MIMIC_OBS_DIM
+from legged_gym.envs.g1.g1_specs import G1_HAND_BODIES
+from legged_gym.envs.g1.g1_mimic_distill_task_config import G1_MIMIC_OBS_DIM
 from pose.util_funcs.kinematics_model import KinematicsModel
 from pose.utils import torch_utils
 from data_utils.rot_utils import euler_from_quaternion
 from legged_gym import LEGGED_GYM_ROOT_DIR
+
 
 def build_static_mimic_obs():
     device = torch.device("cpu")
@@ -40,7 +42,7 @@ def build_static_mimic_obs():
     root_rot = torch.tensor([0.0, 0.0, 0.0, 1.0], dtype=torch.float32, device=device).unsqueeze(0)
     root_pos = root_pos.reshape(1, 1, 3)
 
-    task_body_names = ["left_rubber_hand", "right_rubber_hand"]
+    task_body_names = list(G1_HAND_BODIES)
     local_pos_fk, local_rot_fk, _, _ = kinematics_model.forward_kinematics(
         dof_pos, root_pos, root_rot, task_body_names
     )
@@ -72,10 +74,10 @@ def build_static_mimic_obs():
         dim=-1,
     )[:, 0:1]
     mimic_obs_buf = mimic_obs_buf.reshape(1, -1)
-    if mimic_obs_buf.shape[1] != TASK_MIMIC_OBS_DIM:
+    if mimic_obs_buf.shape[1] != G1_MIMIC_OBS_DIM:
         raise RuntimeError(
             f"Task mimic_obs dim mismatch: got {mimic_obs_buf.shape[1]}, "
-            f"expected {TASK_MIMIC_OBS_DIM}"
+            f"expected {G1_MIMIC_OBS_DIM}"
         )
     return mimic_obs_buf.detach().cpu().numpy().squeeze().astype(np.float32)
 

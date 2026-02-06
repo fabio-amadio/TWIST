@@ -30,8 +30,7 @@ def _collect_names_from_urdf(path: str):
 
 
 def main():
-    path = "../assets/g1/g1_custom_collision_with_fixed_hand.urdf"
-    # path = "../assets/g1/g1_29dof_custom.urdf"
+    path = "../assets/g1/g1_29dof_custom.urdf"
 
     print(f"Loading: {path}")
     bodies, joints = _collect_names_from_urdf(path)
