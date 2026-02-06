@@ -2,7 +2,7 @@ import pickle
 
 
 def main():
-    path = "../track_dataset/twist_motion_dataset/mocap/0.pkl"
+    path = "../track_dataset/twist_motion_dataset_29dof/mocap/0.pkl"
     print(f"Loading: {path}")
     with open(path, "rb") as f:
         data = pickle.load(f)

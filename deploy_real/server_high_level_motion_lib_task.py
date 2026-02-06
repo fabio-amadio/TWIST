@@ -31,7 +31,6 @@ def build_mimic_obs(
     tar_obs_steps,
     task_body_names,
     kinematics_model=None,
-    robot_type: str = "g1",
 ):
     """
     Build the task-based mimic_obs at time-step t_step.
@@ -81,13 +80,6 @@ def build_mimic_obs(
     task_body_rot = task_body_rot.reshape(-1, 4)
     task_body_rot = torch_utils.quat_to_tan_norm(task_body_rot)
     task_body_rot = task_body_rot.reshape(1, task_body_pos.shape[1], -1)
-    dof_pos_for_vis = dof_pos
-    if robot_type == "g1":
-        dof_pos_with_wrist = torch.zeros(25, device=device).reshape(1, 1, 25)
-        wrist_ids = [19, 24]
-        other_ids = [f for f in range(25) if f not in wrist_ids]
-        dof_pos_with_wrist[..., other_ids] = dof_pos
-        dof_pos_for_vis = dof_pos_with_wrist
 
     mimic_obs_buf = torch.cat(
         (
@@ -107,8 +99,8 @@ def build_mimic_obs(
         )
     
     return mimic_obs_buf.detach().cpu().numpy().squeeze(), root_pos.detach().cpu().numpy().squeeze(), \
-        root_rot.detach().cpu().numpy().squeeze(), dof_pos_for_vis.detach().cpu().numpy().squeeze(), \
-            root_vel.detach().cpu().numpy().squeeze(), root_ang_vel.detach().cpu().numpy().squeeze()
+        root_rot.detach().cpu().numpy().squeeze(), dof_pos.detach().cpu().numpy().squeeze(), \
+        root_vel.detach().cpu().numpy().squeeze(), root_ang_vel.detach().cpu().numpy().squeeze()
 
 
 def main(args, xml_file, robot_base):
@@ -124,10 +116,10 @@ def main(args, xml_file, robot_base):
             dof_name = mujoco.mj_id2name(sim_model, mujoco.mjtObj.mjOBJ_JOINT, sim_model.dof_jntid[i])
             print(f"DoF {i}: {dof_name}")
 
-        # print("Body names and their IDs:")
-        # for i in range(self.model.nbody):  # 'nbody' is the number of bodies
-        #     body_name = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_BODY, i)
-        #     print(f"Body ID {i}: {body_name}")
+        print("Body names and their IDs:")
+        for i in range(sim_model.nbody):  # 'nbody' is the number of bodies
+            body_name = mujoco.mj_id2name(sim_model, mujoco.mjtObj.mjOBJ_BODY, i)
+            print(f"Body ID {i}: {body_name}")
         
         print("Motor (Actuator) names and their IDs:")
         for i in range(sim_model.nu):  # 'nu' is the number of actuators (motors)
@@ -177,7 +169,6 @@ def main(args, xml_file, robot_base):
                 tar_obs_steps=tar_obs_steps_tensor,
                 task_body_names=task_body_names,
                 kinematics_model=kinematics_model,
-                robot_type=args.robot,
             )
             if vis_root_vel:
                 root_vel_list.append(root_vel)
@@ -187,7 +178,6 @@ def main(args, xml_file, robot_base):
             # Convert to JSON (list) to put into Redis
             mimic_obs_list = mimic_obs.tolist() if mimic_obs.ndim == 1 else mimic_obs.flatten().tolist()
             redis_client.set(args.redis_mimic_key, json.dumps(mimic_obs_list))
-            last_mimic_obs = mimic_obs
             # Print or log it
             print(f"Step {t_step:4d} => mimic_obs shape = {mimic_obs.shape} published...", end="\r")
 
@@ -230,7 +220,7 @@ def main(args, xml_file, robot_base):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--motion_file", help="Path to your *.pkl motion file for MotionLib", 
-                        default="/home/yanjieze/projects/g1_wbc/humanoid-motion-imitation/track_dataset/twist_motion_dataset/mocap/0.pkl")
+                        default="/home/famadio/Workspace/RL/TWIST/track_dataset/twist_motion_dataset_29dof/mocap/0.pkl")
     parser.add_argument("--robot", type=str, default="g1", choices=["g1"])
     parser.add_argument("--steps", type=str,
                         default="1",
@@ -241,7 +231,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--urdf",
         type=str,
-        default=f"{LEGGED_GYM_ROOT_DIR}/../assets/g1/g1_custom_collision_with_fixed_hand.urdf",
+        default=f"{LEGGED_GYM_ROOT_DIR}/../assets/g1/g1_29dof_custom.urdf",
         help="URDF path for FK fallback if local_body_rot is missing",
     )
     parser.add_argument("--vis", action="store_true", help="Visualize the motion")
@@ -259,7 +249,7 @@ if __name__ == "__main__":
     HERE = os.path.dirname(os.path.abspath(__file__))
     
     if args.robot == "g1":
-        xml_file = f"{HERE}/../assets/g1/g1_mocap_with_wrist_roll.xml"
+        xml_file = f"{HERE}/../assets/g1/g1_29dof_rev_1_0.xml"
         robot_base = "pelvis"
     else:
         raise ValueError(f"robot type {args.robot} not supported")
