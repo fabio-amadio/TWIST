@@ -542,7 +542,12 @@
     <parent link="torso_link"/>
     <child link="head_link"/>
   </joint>
-
+  <link name="head_mocap"></link>
+  <joint name="head_mocap_joint" type="fixed">
+    <origin xyz="0 0 0.4" rpy="0 0 0"/>
+    <parent link="torso_link"/>
+    <child link="head_mocap"/>
+  </joint>
 
   <!-- IMU -->
   <link name="imu_in_torso"></link>
