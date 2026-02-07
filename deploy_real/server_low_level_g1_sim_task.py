@@ -11,8 +11,14 @@ from collections import deque
 import mujoco.viewer as mjv
 from tqdm import tqdm
 from legged_gym.envs.g1.g1_mimic_distill_task_config import G1_MIMIC_OBS_DIM
-import os
-from data_utils.rot_utils import quatToEuler
+from legged_gym.envs.g1.g1_specs import (
+    G1_NUM_DOF,
+    G1_DOF_NAMES,
+    G1_DEFAULT_JOINT_ANGLES,
+    G1_ANKLE_DOF_IDX,
+    G1_XML_PATH,
+)
+from data_utils.rot_utils import quat_rotate_inverse
 
 def draw_root_velocity(mujoco_model, mujoco_data, mujoco_viewer, tgt_root_vel, init_geom_id, root_name, rgba_velocity=[1, 1, 0, 1]):
     """
@@ -43,21 +49,32 @@ def draw_root_velocity(mujoco_model, mujoco_data, mujoco_viewer, tgt_root_vel, i
     return mujoco_viewer.user_scn.ngeom
 
 
+def quat_wxyz_rotate_inverse(quat_wxyz, vec):
+    q_xyzw = np.array(
+        [quat_wxyz[1], quat_wxyz[2], quat_wxyz[3], quat_wxyz[0]],
+        dtype=np.float32,
+    )
+    return quat_rotate_inverse(q_xyzw[None, :], vec[None, :])[0]
+
+
+def projected_gravity_from_quat(quat_wxyz):
+    qw, qx, qy, qz = quat_wxyz
+    return np.array(
+        [
+            2 * (-qz * qx + qw * qy),
+            -2 * (qz * qy + qw * qx),
+            1 - 2 * (qw * qw + qz * qz),
+        ],
+        dtype=np.float32,
+    )
+
+
 # -------------------------------------------------------------------
 # Main low-level policy controller that:
 #   - reads mimic obs from Redis
 #   - feeds into policy
 #   - runs the sim
 # -------------------------------------------------------------------
-def aggregate_wrist_dof_pos(body_dof_pos, wrist_dof_pos):
-    total_degrees = 25
-    wrist_ids = [19, 24]
-    other_ids = [f for f in range(total_degrees) if f not in wrist_ids]
-    whole_body_pd_target = np.zeros(total_degrees)
-    whole_body_pd_target[other_ids] = body_dof_pos
-    whole_body_pd_target[wrist_ids] = wrist_dof_pos
-    
-    return whole_body_pd_target
     
 class RealTimePolicyController:
     def __init__(self, 
@@ -108,7 +125,7 @@ class RealTimePolicyController:
         self.viewer.cam.distance = 2.0
 
         # Example defaults & placeholders
-        self.num_actions = 23
+        self.num_actions = G1_NUM_DOF
         self.sim_duration = 100000.0
         self.sim_dt = 0.001
         self.sim_decimation = 20
@@ -116,55 +133,55 @@ class RealTimePolicyController:
         self.last_action = np.zeros(self.num_actions, dtype=np.float32)
 
         # PD Gains, etc. (adapt as needed)
-        self.default_dof_pos = np.array([
-                -0.2, 0.0, 0.0, 0.4, -0.2, 0.0,  # left leg (6)
-                -0.2, 0.0, 0.0, 0.4, -0.2, 0.0,  # right leg (6)
-                0.0, 0.0, 0.0, # torso (1)
-                0.0, 0.4, 0.0, 1.2,
-                0.0, -0.4, 0.0, 1.2,
-            ])
-        self.mujoco_default_dof_pos = np.concatenate([
-            np.array([0, 0, 0.793]),
-            np.array([0, 0, 0, 1]),
-             np.array([-0.2, 0.0, 0.0, 0.4, -0.2, 0.0,  # left leg (6)
-                -0.2, 0.0, 0.0, 0.4, -0.2, 0.0,  # right leg (6)
-                0.0, 0.0, 0.0, # torso (1)
-                0.0, 0.2, 0.0, 1.2, 0.0, # left arm (4)
-                0.0, -0.2, 0.0, 1.2, 0.0, # right arm (4)
-                ])
-        ])
-        self.stiffness = np.array([
-                100, 100, 100, 150, 40, 40,
-                100, 100, 100, 150, 40, 40,
-                150, 150, 150,
-                40, 40, 40, 40, 20,
-                40, 40, 40, 40, 20,
-            ])
-        self.damping = np.array([
-                2, 2, 2, 4, 2, 2,
-                2, 2, 2, 4, 2, 2,
-                4, 4, 4,
-                5, 5, 5, 5, 1,
-                5, 5, 5, 5, 1,
-            ])
-        self.torque_limits = np.array([
-                88, 139, 88, 139, 50, 50,
-                88, 139, 88, 139, 50, 50,
-                88, 50, 50,
-                25, 25, 25, 25, 25,
-                25, 25, 25, 25, 25,
-            ])
+        self.default_dof_pos = np.array(
+            [G1_DEFAULT_JOINT_ANGLES[name] for name in G1_DOF_NAMES],
+            dtype=np.float32,
+        )
+        self.mujoco_default_dof_pos = np.concatenate(
+            [
+                np.array([0.0, 0.0, 0.793], dtype=np.float32),
+                np.array([0.0, 0.0, 0.0, 1.0], dtype=np.float32),
+                self.default_dof_pos,
+            ]
+        )
+
+        leg_kp = [100, 100, 100, 150, 40, 40] * 2
+        waist_kp = [150, 150, 150]
+        arm_kp = [40, 40, 40, 40]
+        wrist_kp = [20, 20, 20]
+        self.stiffness = np.array(
+            leg_kp + waist_kp + arm_kp + wrist_kp + arm_kp + wrist_kp,
+            dtype=np.float32,
+        )
+
+        leg_kd = [2, 2, 2, 4, 2, 2] * 2
+        waist_kd = [4, 4, 4]
+        arm_kd = [5, 5, 5, 5]
+        wrist_kd = [1, 1, 1]
+        self.damping = np.array(
+            leg_kd + waist_kd + arm_kd + wrist_kd + arm_kd + wrist_kd,
+            dtype=np.float32,
+        )
+
+        leg_tau = [88, 139, 88, 139, 50, 50] * 2
+        waist_tau = [88, 50, 50]
+        arm_tau = [25, 25, 25, 25]
+        wrist_tau = [25, 25, 25]
+        self.torque_limits = np.array(
+            leg_tau + waist_tau + arm_tau + wrist_tau + arm_tau + wrist_tau,
+            dtype=np.float32,
+        )
         
         self.action_scale = 0.5
         self.clip_actions = 5.0
         self.action_clip = self.clip_actions / self.action_scale
 
         
-        self.ankle_idx = [4, 5, 10, 11]
+        self.ankle_idx = list(G1_ANKLE_DOF_IDX)
         
         # For multi-step history
         self.n_mimic_obs = G1_MIMIC_OBS_DIM
-        self.n_proprio = 3 + 2 + 3 * self.num_actions
+        self.n_proprio = 3 + 3 + 3 + 3 * self.num_actions
         self.n_obs_single = self.n_mimic_obs + self.n_proprio
         self.proprio_history_buf = deque(maxlen=10)
         for _ in range(10):
@@ -175,28 +192,14 @@ class RealTimePolicyController:
     def extract_data(self):
         qpos = self.data.qpos.astype(np.float32)
         qvel = self.data.qvel.astype(np.float32)
-        
-        body_ids = [0,1,2,3,4,5,
-                    6,7,8,9,10,11,
-                    12,13,14,
-                    15,16,17,18,# 19
-                    20,21,22,23, # 24
-                    ]
-        wrist_ids = [19, 24]
-        
-        whole_body_dof = qpos[7:]
-        whole_body_dof_vel = qvel[6:]
-        body_dof_pos = qpos[[f+7 for f in body_ids]]
-        body_dof_vel = qvel[[f+6 for f in body_ids]]
-        # wrist_dof_pos = qpos[[f+7 for f in wrist_ids]]
-        # wrist_dof_vel = qvel[[f+6 for f in wrist_ids]]
-        wrist_dof_pos = 0.0
-        wrist_dof_vel = 0.0
-        # But wrist joints still move! (use 23 dof version)
 
-        quat = self.data.sensor('orientation').data.astype(np.float32)
+        dof_pos = qpos[7:7 + self.num_actions]
+        dof_vel = qvel[6:6 + self.num_actions]
+
+        quat = self.data.sensor('orientation').data.astype(np.float32)  # wxyz
         ang_vel = self.data.sensor('angular-velocity').data.astype(np.float32)
-        return whole_body_dof, whole_body_dof_vel, body_dof_pos, body_dof_vel, wrist_dof_pos, wrist_dof_vel, quat, ang_vel
+        lin_vel_world = qvel[0:3].astype(np.float32)
+        return dof_pos, dof_vel, quat, ang_vel, lin_vel_world
 
     def reset_sim(self):
         mujoco.mj_resetData(self.model, self.data)
@@ -224,25 +227,27 @@ class RealTimePolicyController:
         pbar = tqdm(range(steps), desc="Simulating...")
 
         # send initial proprio to redis
-        proprio_json = json.dumps(self.proprio_history_buf[0].tolist())
+        proprio_json = json.dumps(np.zeros(self.n_proprio, dtype=np.float32).tolist())
         self.redis_client.set("state_body_g1", proprio_json)
         self.redis_client.set("state_hand_g1", json.dumps(np.zeros(14).tolist()))
         try:
             for i in pbar:
                 
                 t_start = time.time()
-                whole_body_dof, whole_body_dof_vel, body_dof_pos, body_dof_vel, wrist_dof_pos, wrist_dof_vel, quat, ang_vel = self.extract_data()
+                dof_pos, dof_vel, quat, ang_vel, lin_vel_world = self.extract_data()
                 
                 if i % self.sim_decimation == 0:
                     
                     # Build a "proprio" vector for your policy, e.g.:
-                    rpy = quatToEuler(quat)
-                    obs_body_dof_vel = body_dof_vel.copy()
+                    base_lin_vel = quat_wxyz_rotate_inverse(quat, lin_vel_world)
+                    projected_gravity = projected_gravity_from_quat(quat)
+                    obs_body_dof_vel = dof_vel.copy()
                     obs_body_dof_vel[self.ankle_idx] = 0.
                     obs_proprio = np.concatenate([
                         ang_vel * 0.25,
-                        rpy[:2],
-                        (body_dof_pos - self.default_dof_pos),
+                        base_lin_vel,
+                        projected_gravity,
+                        (dof_pos - self.default_dof_pos),
                         obs_body_dof_vel * 0.05,
                         self.last_action
                     ])
@@ -274,7 +279,6 @@ class RealTimePolicyController:
                     raw_action = np.clip(raw_action, -self.action_clip, self.action_clip)
                     scaled_actions = raw_action * self.action_scale
                     pd_target = scaled_actions + self.default_dof_pos
-                    pd_target = aggregate_wrist_dof_pos(pd_target, wrist_dof_pos)
                     # debug draw velocity arrow if you want
                     self.viewer.user_scn.ngeom = 0
                     draw_root_velocity(self.model, self.data, self.viewer, [0,0,0], 0, "pelvis", [1,0,0,1])
@@ -288,7 +292,7 @@ class RealTimePolicyController:
                         mp4_writer.append_data(img)
 
                 # PD control
-                torque = (pd_target - whole_body_dof) * self.stiffness - whole_body_dof_vel * self.damping
+                torque = (pd_target - dof_pos) * self.stiffness - dof_vel * self.damping
                 torque = np.clip(torque, -self.torque_limits, self.torque_limits)
                 
                 self.data.ctrl[:] = torque
@@ -322,9 +326,7 @@ def main_low_level_sim(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    HERE = os.path.dirname(os.path.abspath(__file__))
-    
-    parser.add_argument("--xml_file", default=os.path.join(HERE, "../assets/g1/g1_sim2sim_with_wrist_roll.xml"), help="Mujoco XML file")
+    parser.add_argument("--xml_file", default=G1_XML_PATH, help="Mujoco XML file")
     
     parser.add_argument("--policy_path",  help="Path to the policy",
                         default="../assets/twist_general_motion_tracker.pt"

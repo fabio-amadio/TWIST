@@ -5,10 +5,11 @@ UniTask‑LM unifies locomotion and manipulation by tracking task‑space refere
 
 ## NOTES
 
-- [x] Training with the **G1-23dof** &rarr; hard to track EE orientation without wrist joints &rarr; **TODO**: use the **G1-29dof**
-- [x] Currently representing **rotations** using the **tangent and normal vectors** (not the first two columns of **R**)
-- [ ] Add `base_lin_vel` into proprioceptive observations
-- [ ] Use `projected_gravity` instead of `roll` and `pitch` inside the proprioceptive observations
+- [x] Training with the **G1-29dof** (wrist joints included)
+- [x] Representing **rotations** using the **first two columns** of **R** (rot6d)
+- [x] Add `base_lin_vel` into proprioceptive observations
+- [x] Use `projected_gravity` instead of `roll` and `pitch` inside the proprioceptive observations
+- [x] Remove `z` height from the `mimic_obs` &rarr; avoid the need of coordinating ref. height with ref. hands positions.
 
 ## Installation
 

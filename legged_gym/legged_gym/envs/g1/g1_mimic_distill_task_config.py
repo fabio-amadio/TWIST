@@ -14,7 +14,7 @@ from legged_gym.envs.g1.g1_specs import (
     G1_URDF_PATH,
 )
 
-G1_MIMIC_OBS_DIM: int = 1 + 2 + 1 + 3 * 2 + 6 * 2
+G1_MIMIC_OBS_DIM: int = 2 + 1 + 3 * 2 + 6 * 2
 NUM_KEY_BODIES = len(G1_KEY_BODIES)
 
 
@@ -50,7 +50,7 @@ class G1MimicDistillTaskPrivCfg(HumanoidMimicCfg):
         extra_critic_obs = 3
         n_priv = 0
 
-        n_proprio = 3 + 2 + 3 * num_actions
+        n_proprio = 3 + 3 + 3 + 3 * num_actions
         # mimic obs (student):
         n_mimic_obs = G1_MIMIC_OBS_DIM
         # priv_mimic_obs (teacher):
@@ -367,7 +367,7 @@ class G1MimicDistillTaskStuCfg(G1MimicDistillTaskPrivCfg):
         extra_critic_obs = 3
         n_priv = 0
 
-        n_proprio = 3 + 2 + 3 * num_actions
+        n_proprio = 3 + 3 + 3 + 3 * num_actions
         n_mimic_obs = G1_MIMIC_OBS_DIM
         n_priv_mimic_obs = len(tar_obs_steps) * (
             1 + 3 + 3 + 1 + num_actions + 3 * NUM_KEY_BODIES
@@ -418,7 +418,7 @@ class G1MimicDistillTaskStuRLCfg(G1MimicDistillTaskPrivCfg):
         extra_critic_obs = 3
         n_priv = 0
 
-        n_proprio = 3 + 2 + 3 * num_actions
+        n_proprio = 3 + 3 + 3 + 3 * num_actions
         n_mimic_obs = G1_MIMIC_OBS_DIM
         n_priv_mimic_obs = len(tar_obs_steps) * (
             1 + 3 + 3 + 1 + num_actions + 3 * NUM_KEY_BODIES

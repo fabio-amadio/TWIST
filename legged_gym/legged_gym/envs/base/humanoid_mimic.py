@@ -388,20 +388,21 @@ class HumanoidMimic(HumanoidChar):
             root_vel, # 3 dims
             root_ang_vel[..., 2:3], # 1 dim, yaw only
             dof_pos, # num_dof dims
-        ), dim=-1) # shape: (num_envs, num_steps, 7 + num_dof)
+        ), dim=-1) # shape: (num_envs, num_steps, 9 + num_dof)
         
         return mimic_obs_buf.reshape(self.num_envs, -1)
         
     def compute_observations(self):
         # imu_obs = torch.stack((self.roll, self.pitch, self.yaw - self.init_yaw), dim=1)
-        imu_obs = torch.stack((self.roll, self.pitch), dim=1)
+        imu_obs = self.projected_gravity
         
         self.base_yaw_quat = quat_from_euler_xyz(0*self.yaw, 0*self.yaw, self.yaw)
         
         mimic_obs = self._get_mimic_obs()
         obs_buf = torch.cat((
-                            mimic_obs, # (11 + num_dof) * num_steps
+                            mimic_obs, # (9 + num_dof) * num_steps
                             self.base_ang_vel  * self.obs_scales.ang_vel,   # 3 dims
+                            self.base_lin_vel  * self.obs_scales.lin_vel,   # 3 dims
                             imu_obs,    # 3 dims
                             self.reindex((self.dof_pos - self.default_dof_pos_all) * self.obs_scales.dof_pos),
                             self.reindex(self.dof_vel * self.obs_scales.dof_vel),
@@ -445,12 +446,14 @@ class HumanoidMimic(HumanoidChar):
         if not self.cfg.noise.add_noise:
             return noise_scale_vec
         ang_vel_dim = 3
-        imu_dim = 2
+        lin_vel_dim = 3
+        imu_dim = 3
         noise_start_dim = self.cfg.env.n_mimic_obs * len(self._tar_obs_steps)
         noise_scale_vec[:, noise_start_dim:noise_start_dim+ang_vel_dim] = self.cfg.noise.noise_scales.ang_vel
-        noise_scale_vec[:, noise_start_dim+ang_vel_dim:noise_start_dim+ang_vel_dim+imu_dim] = self.cfg.noise.noise_scales.imu
-        noise_scale_vec[:, noise_start_dim+(ang_vel_dim+imu_dim):noise_start_dim+(ang_vel_dim+imu_dim)+self.num_dof] = self.cfg.noise.noise_scales.dof_pos
-        noise_scale_vec[:, noise_start_dim+(ang_vel_dim+imu_dim)+self.num_dof:noise_start_dim+(ang_vel_dim+imu_dim)+2*self.num_dof] = self.cfg.noise.noise_scales.dof_vel
+        noise_scale_vec[:, noise_start_dim+ang_vel_dim:noise_start_dim+ang_vel_dim+lin_vel_dim] = self.cfg.noise.noise_scales.lin_vel
+        noise_scale_vec[:, noise_start_dim+ang_vel_dim+lin_vel_dim:noise_start_dim+ang_vel_dim+lin_vel_dim+imu_dim] = self.cfg.noise.noise_scales.imu
+        noise_scale_vec[:, noise_start_dim+(ang_vel_dim+lin_vel_dim+imu_dim):noise_start_dim+(ang_vel_dim+lin_vel_dim+imu_dim)+self.num_dof] = self.cfg.noise.noise_scales.dof_pos
+        noise_scale_vec[:, noise_start_dim+(ang_vel_dim+lin_vel_dim+imu_dim)+self.num_dof:noise_start_dim+(ang_vel_dim+lin_vel_dim+imu_dim)+2*self.num_dof] = self.cfg.noise.noise_scales.dof_vel
         return noise_scale_vec
     
     

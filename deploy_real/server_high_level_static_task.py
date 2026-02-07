@@ -7,45 +7,29 @@ import numpy as np
 import isaacgym
 import torch
 from rich import print
-import os
 # ---------------------------------------------------------------------
 # Example imports: adapt to your actual file structure
 # ---------------------------------------------------------------------
-from legged_gym.envs.g1.g1_specs import G1_HAND_BODIES
+from legged_gym.envs.g1.g1_specs import (
+    G1_HAND_BODIES,
+    G1_DOF_NAMES,
+    G1_DEFAULT_JOINT_ANGLES,
+    G1_URDF_PATH,
+)
 from legged_gym.envs.g1.g1_mimic_distill_task_config import G1_MIMIC_OBS_DIM
 from pose.util_funcs.kinematics_model import KinematicsModel
 from pose.utils import torch_utils
-from data_utils.rot_utils import euler_from_quaternion
-from legged_gym import LEGGED_GYM_ROOT_DIR
 
 
 def build_static_mimic_obs():
     device = torch.device("cpu")
     kinematics_model = KinematicsModel(
-        f"{LEGGED_GYM_ROOT_DIR}/../assets/g1/g1_custom_collision_with_fixed_hand.urdf",
+        G1_URDF_PATH,
         device=device,
     )
 
-    # default pose (23 dof, no wrist roll)
-    # dof_pos = torch.tensor(
-    #     [
-    #         -0.2, 0.0, 0.0, 0.4, -0.2, 0.0,  # left leg
-    #         -0.2, 0.0, 0.0, 0.4, -0.2, 0.0,  # right leg
-    #         0.0, 0.0, 0.0,  # torso
-    #         0.0, 0.4, 0.0, 1.2,  # left arm
-    #         0.0, -0.4, 0.0, 1.2,  # right arm
-    #     ],
-    #     dtype=torch.float32,
-    #     device=device,
-    # ).unsqueeze(0)
     dof_pos = torch.tensor(
-        [
-            -0.2, 0.0, 0.0, 0.4, -0.2, 0.0,  # left leg
-            -0.2, 0.0, 0.0, 0.4, -0.2, 0.0,  # right leg
-            0.0, 0.0, 0.0,  # torso
-            0.0, 0.0, 0.0, 0.0,  # left arm
-            0.0, 0.0, 0.0, 0.0,  # right arm
-        ],
+        [G1_DEFAULT_JOINT_ANGLES[name] for name in G1_DOF_NAMES],
         dtype=torch.float32,
         device=device,
     ).unsqueeze(0)
@@ -58,11 +42,6 @@ def build_static_mimic_obs():
     local_pos_fk, local_rot_fk, _, _ = kinematics_model.forward_kinematics(
         dof_pos, root_pos, root_rot, task_body_names
     )
-
-    # roll, pitch, yaw = euler_from_quaternion(root_rot)
-    # roll = roll.reshape(1, 1, 1)
-    # pitch = pitch.reshape(1, 1, 1)
-    # yaw = yaw.reshape(1, 1, 1)
 
     root_vel = torch.zeros((1, 1, 3), dtype=torch.float32, device=device)
     root_ang_vel = torch.zeros((1, 1, 3), dtype=torch.float32, device=device)
@@ -77,7 +56,6 @@ def build_static_mimic_obs():
 
     mimic_obs_buf = torch.cat(
         (
-            root_pos[..., 2:3],  # 1 dim
             root_vel[..., 0:2],  # 2 dims, x, y only
             root_ang_vel[..., 2:3],  # 1 dim, yaw only
             task_body_pos,  # num_task_bodies * 3 dims
