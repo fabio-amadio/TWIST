@@ -288,10 +288,11 @@ class LeggedRobot(BaseTask):
         """ 
         Computes observations
         """
-        imu_obs = torch.stack((self.roll, self.pitch), dim=1)
+        imu_obs = self.projected_gravity
         obs_buf = torch.cat((#skill_vector, 
                             self.base_ang_vel  * self.obs_scales.ang_vel,   #[1,3]
-                            imu_obs,    #[1,2]
+                            self.base_lin_vel  * self.obs_scales.lin_vel,   #[1,3]
+                            imu_obs,    #[1,3]
                             self.commands[:, 0:1],  #[1,1]
                             self.reindex((self.dof_pos - self.default_dof_pos_all) * self.obs_scales.dof_pos),
                             self.reindex(self.dof_vel * self.obs_scales.dof_vel),
@@ -596,13 +597,13 @@ class LeggedRobot(BaseTask):
         noise_scales = self.cfg.noise.noise_scales
         noise_level = self.cfg.noise.noise_level
         noise_vec[:3] = noise_scales.ang_vel * noise_level * self.obs_scales.ang_vel
-        noise_vec[3:6] = noise_scales.gravity * noise_level
-        noise_vec[6] = 0.
-        noise_vec[7] = 0. #commands
-        noise_vec[8:8+self.num_dof] = noise_scales.dof_pos * noise_level * self.obs_scales.dof_pos
-        noise_vec[8+self.num_dof:8+self.num_dof*2] = noise_scales.dof_vel * noise_level * self.obs_scales.dof_vel
-        noise_vec[8+self.num_dof*2:8+self.num_dof*3] = 0.0
-        noise_vec[8+self.num_dof*3:8+self.num_dof*3+2] = 0. 
+        noise_vec[3:6] = noise_scales.lin_vel * noise_level * self.obs_scales.lin_vel
+        noise_vec[6:9] = noise_scales.gravity * noise_level
+        noise_vec[9] = 0.  # commands
+        noise_vec[10:10+self.num_dof] = noise_scales.dof_pos * noise_level * self.obs_scales.dof_pos
+        noise_vec[10+self.num_dof:10+self.num_dof*2] = noise_scales.dof_vel * noise_level * self.obs_scales.dof_vel
+        noise_vec[10+self.num_dof*2:10+self.num_dof*3] = 0.0
+        noise_vec[10+self.num_dof*3:10+self.num_dof*3+2] = 0. 
 
         return noise_vec
 

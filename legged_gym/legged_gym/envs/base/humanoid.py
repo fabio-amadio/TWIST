@@ -419,9 +419,10 @@ class Humanoid(LeggedRobot):
             return noise_scale_vec
         noise_start_dim = 2 + self.cfg.commands.num_commands
         noise_scale_vec[:, noise_start_dim:noise_start_dim+3] = self.cfg.noise.noise_scales.ang_vel
-        noise_scale_vec[:, noise_start_dim+3:noise_start_dim+5] = self.cfg.noise.noise_scales.imu
-        noise_scale_vec[:, noise_start_dim+5:noise_start_dim+5+self.num_dof] = self.cfg.noise.noise_scales.dof_pos
-        noise_scale_vec[:, noise_start_dim+5+self.num_dof:noise_start_dim+5+2*self.num_dof] = self.cfg.noise.noise_scales.dof_vel
+        noise_scale_vec[:, noise_start_dim+3:noise_start_dim+6] = self.cfg.noise.noise_scales.lin_vel
+        noise_scale_vec[:, noise_start_dim+6:noise_start_dim+9] = self.cfg.noise.noise_scales.imu
+        noise_scale_vec[:, noise_start_dim+9:noise_start_dim+9+self.num_dof] = self.cfg.noise.noise_scales.dof_pos
+        noise_scale_vec[:, noise_start_dim+9+self.num_dof:noise_start_dim+9+2*self.num_dof] = self.cfg.noise.noise_scales.dof_vel
         return noise_scale_vec
     
     def compute_observations(self):
@@ -432,7 +433,7 @@ class Humanoid(LeggedRobot):
         sin_pos = torch.sin(2 * torch.pi * phase).unsqueeze(1)
         cos_pos = torch.cos(2 * torch.pi * phase).unsqueeze(1)
         
-        imu_obs = torch.stack((self.roll, self.pitch), dim=1)
+        imu_obs = self.projected_gravity
         self.base_yaw_quat = quat_from_euler_xyz(0*self.yaw, 0*self.yaw, self.yaw)
         # self.commands[:] = 0.
         obs_buf = torch.cat((
@@ -440,7 +441,8 @@ class Humanoid(LeggedRobot):
                             cos_pos,
                             self.commands,  # 3 dims
                             self.base_ang_vel  * self.obs_scales.ang_vel,   # 3 dims
-                            imu_obs,    # 2 dims
+                            self.base_lin_vel  * self.obs_scales.lin_vel,   # 3 dims
+                            imu_obs,    # 3 dims
                             self.reindex((self.dof_pos - self.default_dof_pos_all) * self.obs_scales.dof_pos),
                             self.reindex(self.dof_vel * self.obs_scales.dof_vel),
                             self.reindex(self.action_history_buf[:, -1]),

@@ -90,6 +90,38 @@ def quat_to_tan_norm(q):
     return norm_tan
 
 @torch.jit.script
+def quat_to_rot6d(q):
+    # type: (Tensor) -> Tensor
+    # represents a rotation using the first two columns of the rotation matrix
+    # q is expected to be in (x, y, z, w) format
+    x = q[..., 0]
+    y = q[..., 1]
+    z = q[..., 2]
+    w = q[..., 3]
+
+    xx = x * x
+    yy = y * y
+    zz = z * z
+    xy = x * y
+    xz = x * z
+    yz = y * z
+    wx = w * x
+    wy = w * y
+    wz = w * z
+
+    r00 = 1.0 - 2.0 * (yy + zz)
+    r10 = 2.0 * (xy + wz)
+    r20 = 2.0 * (xz - wy)
+
+    r01 = 2.0 * (xy - wz)
+    r11 = 1.0 - 2.0 * (xx + zz)
+    r21 = 2.0 * (yz + wx)
+
+    col0 = torch.stack((r00, r10, r20), dim=-1)
+    col1 = torch.stack((r01, r11, r21), dim=-1)
+    return torch.cat((col0, col1), dim=-1)
+
+@torch.jit.script
 def euler_xyz_to_exp_map(roll, pitch, yaw):
     # type: (Tensor, Tensor, Tensor) -> Tensor
     q = quat_from_euler_xyz(roll, pitch, yaw)

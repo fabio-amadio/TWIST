@@ -90,26 +90,11 @@ def play(args):
 
     history_len = 10
 
-    if args.robot == "g1":
-        num_actions = 23
-        n_proprio = 3 + 2 + 3 * num_actions
-        n_mimic_obs = G1_MIMIC_OBS_DIM
-        n_obs_single = n_mimic_obs + n_proprio
-        num_observations = n_obs_single * (history_len + 1)
-    elif args.robot == "t1":
-        num_actions = 21
-        n_proprio = 3 + 2 + 3 * num_actions
-        n_mimic_obs = 8 + 21
-        n_obs_single = n_mimic_obs + n_proprio
-        num_observations = n_obs_single * (history_len + 1)
-    elif args.robot == "toddy":
-        num_actions = 22
-        n_proprio = 3 + 2 + 3 * num_actions
-        n_mimic_obs = 8 + 22
-        n_obs_single = n_mimic_obs + n_proprio
-        num_observations = n_obs_single * (history_len + 1)
-    else:
-        raise ValueError(f"Robot {args.robot} not supported!")
+    num_actions = 29
+    n_proprio = 3 + 3 + 3 + 3 * num_actions
+    n_mimic_obs = G1_MIMIC_OBS_DIM
+    n_obs_single = n_mimic_obs + n_proprio
+    num_observations = n_obs_single * (history_len + 1)
 
     device = torch.device("cpu")
     policy = HardwareRefNN(
@@ -171,7 +156,7 @@ def play(args):
         )
         traced_policy.save(save_path)
         cprint(f"Saved traced_actor at {os.path.abspath(save_path)}", "green")
-        cprint(f"Robot: {args.robot}", "green")
+        cprint("Robot: g1 (29-DOF)", "green")
 
 
 if __name__ == "__main__":
@@ -179,7 +164,6 @@ if __name__ == "__main__":
     parser.add_argument("--proj_name", type=str)
     parser.add_argument("--exptid", type=str)
     parser.add_argument("--checkpoint", type=int, default=-1)
-    parser.add_argument("--robot", type=str, default="g1")  # options: g1
 
     args = parser.parse_args()
     play(args)

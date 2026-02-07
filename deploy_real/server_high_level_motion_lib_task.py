@@ -7,17 +7,15 @@ import numpy as np
 import isaacgym
 import torch
 from rich import print
-import os
 import mujoco
 from mujoco.viewer import launch_passive
 # ---------------------------------------------------------------------
 # Example imports: adapt to your actual file structure
 # ---------------------------------------------------------------------
-from isaacgym.torch_utils import quat_mul
 from pose.utils.motion_lib_pkl import MotionLib
 from pose.utils import torch_utils
 from pose.util_funcs.kinematics_model import KinematicsModel
-from data_utils.rot_utils import euler_from_quaternion, quat_rotate_inverse_torch
+from data_utils.rot_utils import quat_rotate_inverse_torch
 from legged_gym.envs.g1.g1_specs import G1_HAND_BODIES, G1_URDF_PATH, G1_XML_PATH
 from legged_gym.envs.g1.g1_mimic_distill_task_config import G1_MIMIC_OBS_DIM
 
@@ -54,12 +52,6 @@ def build_mimic_obs(
             f"motion dof_pos has {dof_pos.shape[1]} joints, "
             f"kinematics model expects {kinematics_model.num_joints}."
         )
-    # Convert to euler (roll, pitch, yaw)
-    roll, pitch, yaw = euler_from_quaternion(root_rot)
-    roll = roll.reshape(1, -1, 1)
-    pitch = pitch.reshape(1, -1, 1)
-    yaw = yaw.reshape(1, -1, 1)
-
     root_vel = quat_rotate_inverse_torch(root_rot, root_vel)
     root_ang_vel = quat_rotate_inverse_torch(root_rot, root_ang_vel)
 
@@ -84,12 +76,11 @@ def build_mimic_obs(
     root_ang_vel = root_ang_vel.reshape(1, -1, 3)
     task_body_pos = task_body_pos.reshape(1, task_body_pos.shape[0], -1)
     task_body_rot = task_body_rot.reshape(-1, 4)
-    task_body_rot = torch_utils.quat_to_tan_norm(task_body_rot)
+    task_body_rot = torch_utils.quat_to_rot6d(task_body_rot)
     task_body_rot = task_body_rot.reshape(1, task_body_pos.shape[1], -1)
 
     mimic_obs_buf = torch.cat(
         (
-            root_pos[..., 2:3],  # 1 dim
             root_vel[..., 0:2],  # 2 dims, x, y only
             root_ang_vel[..., 2:3],  # 1 dim, yaw only
             task_body_pos,  # num_task_bodies * 3 dims
@@ -254,8 +245,6 @@ if __name__ == "__main__":
     print("Motion file: ", args.motion_file)
     print("Steps: ", args.steps)
     print("Task bodies: ", args.task_bodies)
-    
-    HERE = os.path.dirname(os.path.abspath(__file__))
     
     if args.robot == "g1":
         xml_file = G1_XML_PATH

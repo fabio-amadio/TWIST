@@ -34,7 +34,7 @@ class HumanoidCfg(BaseConfig):
     class env:
         num_envs = 8192
         num_actions = 19
-        n_proprio = 3 + 2 + 3*num_actions
+        n_proprio = 3 + 3 + 3 + 3*num_actions
         n_priv_latent = 4 + 1 + 2*num_actions
         history_len = 10
         n_priv = 0
@@ -239,6 +239,7 @@ class HumanoidCfg(BaseConfig):
     class normalization:
         class obs_scales:
             ang_vel = 0.25
+            lin_vel = 1.0
             dof_pos = 1.0
             dof_vel = 0.05
             imu = 0.5

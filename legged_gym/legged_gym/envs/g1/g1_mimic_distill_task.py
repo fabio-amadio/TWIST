@@ -158,20 +158,36 @@ class G1MimicDistillTask(HumanoidMimic):
         if not self.cfg.noise.add_noise:
             return noise_scale_vec
         ang_vel_dim = 3
-        imu_dim = 2
+        lin_vel_dim = 3
+        imu_dim = 3
 
         noise_scale_vec[:, 0:ang_vel_dim] = self.cfg.noise.noise_scales.ang_vel
-        noise_scale_vec[:, ang_vel_dim : ang_vel_dim + imu_dim] = (
-            self.cfg.noise.noise_scales.imu
+        noise_scale_vec[:, ang_vel_dim : ang_vel_dim + lin_vel_dim] = (
+            self.cfg.noise.noise_scales.lin_vel
         )
         noise_scale_vec[
-            :, ang_vel_dim + imu_dim : ang_vel_dim + imu_dim + self.num_dof
+            :,
+            ang_vel_dim
+            + lin_vel_dim : ang_vel_dim
+            + lin_vel_dim
+            + imu_dim,
+        ] = self.cfg.noise.noise_scales.imu
+        noise_scale_vec[
+            :,
+            ang_vel_dim
+            + lin_vel_dim
+            + imu_dim : ang_vel_dim
+            + lin_vel_dim
+            + imu_dim
+            + self.num_dof,
         ] = self.cfg.noise.noise_scales.dof_pos
         noise_scale_vec[
             :,
             ang_vel_dim
+            + lin_vel_dim
             + imu_dim
             + self.num_dof : ang_vel_dim
+            + lin_vel_dim
             + imu_dim
             + 2 * self.num_dof,
         ] = self.cfg.noise.noise_scales.dof_vel
@@ -268,7 +284,7 @@ class G1MimicDistillTask(HumanoidMimic):
         )
         task_body_pos = task_body_pos.reshape(self.num_envs, num_steps, -1)
         task_body_rot = task_body_rot.reshape(-1, 4)
-        task_body_rot = torch_utils.quat_to_tan_norm(task_body_rot)
+        task_body_rot = torch_utils.quat_to_rot6d(task_body_rot)
         task_body_rot = task_body_rot.reshape(self.num_envs, num_steps, -1)
         dof_pos = dof_pos.reshape(self.num_envs, num_steps, dof_pos.shape[-1])
 
@@ -288,10 +304,9 @@ class G1MimicDistillTask(HumanoidMimic):
             dim=-1,
         )
 
-        # shape: (num_envs, 1, 1+2+1+3*num_task_bodies+6*num_task_bodies)
+        # shape: (num_envs, 2+1+3*num_task_bodies+6*num_task_bodies)
         mimic_obs_buf = torch.cat(
             (
-                root_pos[..., 2:3],  # 1 dim
                 root_vel[..., 0:2],  # 2 dims, x, y only
                 root_ang_vel[..., 2:3],  # 1 dim, yaw only
                 task_body_pos,  # num_task_bodies * 3 dims
@@ -305,17 +320,15 @@ class G1MimicDistillTask(HumanoidMimic):
         ), mimic_obs_buf.reshape(self.num_envs, -1)
 
     def compute_observations(self):
-        imu_obs = torch.stack((self.roll, self.pitch), dim=1)
-        self.base_yaw_quat = quat_from_euler_xyz(
-            0 * self.yaw, 0 * self.yaw, self.yaw
-        )
+        imu_obs = self.projected_gravity
         priv_mimic_obs, mimic_obs = self._get_mimic_obs()
 
-        # shape: (num_envs, 3 + 2 + num_dof + num_dof + num_actions)
+        # shape: (num_envs, 3 + 3 + 3 + num_dof + num_dof + num_actions)
         proprio_obs_buf = torch.cat(
             (
                 self.base_ang_vel * self.obs_scales.ang_vel,  # 3 dims
-                imu_obs,  # 2 dims
+                self.base_lin_vel * self.obs_scales.lin_vel,  # 3 dims
+                imu_obs,  # 3 dims
                 self.reindex(
                     (self.dof_pos - self.default_dof_pos_all)
                     * self.obs_scales.dof_pos
@@ -344,7 +357,7 @@ class G1MimicDistillTask(HumanoidMimic):
             ) * self.noise_scale_vec
         else:
             proprio_obs_buf += 0.0
-        dof_vel_start_dim = 5 + self.dof_pos.shape[1]
+        dof_vel_start_dim = 9 + self.dof_pos.shape[1]
 
         # disable ankle dof
         proprio_obs_buf[:, [dof_vel_start_dim + i for i in G1_ANKLE_DOF_IDX]] = 0.0
