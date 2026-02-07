@@ -1,4 +1,4 @@
-root_path: /home/famadio/Workspace/RL/TWIST/track_dataset/twist_motion_dataset_29dof
+root_path: /home/famadio/dev/TWIST/track_dataset/twist_motion_dataset_29dof
 motions:
 - file: mocap/0.pkl
   weight: 100.0
