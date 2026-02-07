@@ -84,7 +84,7 @@ def build_mimic_obs(
     root_ang_vel = root_ang_vel.reshape(1, -1, 3)
     task_body_pos = task_body_pos.reshape(1, task_body_pos.shape[0], -1)
     task_body_rot = task_body_rot.reshape(-1, 4)
-    task_body_rot = torch_utils.quat_to_tan_norm(task_body_rot)
+    task_body_rot = torch_utils.quat_to_rot6d(task_body_rot)
     task_body_rot = task_body_rot.reshape(1, task_body_pos.shape[1], -1)
 
     mimic_obs_buf = torch.cat(

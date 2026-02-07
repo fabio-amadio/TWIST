@@ -268,7 +268,7 @@ class G1MimicDistillTask(HumanoidMimic):
         )
         task_body_pos = task_body_pos.reshape(self.num_envs, num_steps, -1)
         task_body_rot = task_body_rot.reshape(-1, 4)
-        task_body_rot = torch_utils.quat_to_tan_norm(task_body_rot)
+        task_body_rot = torch_utils.quat_to_rot6d(task_body_rot)
         task_body_rot = task_body_rot.reshape(self.num_envs, num_steps, -1)
         dof_pos = dof_pos.reshape(self.num_envs, num_steps, dof_pos.shape[-1])
 

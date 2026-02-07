@@ -68,7 +68,7 @@ def build_static_mimic_obs():
     root_ang_vel = torch.zeros((1, 1, 3), dtype=torch.float32, device=device)
     task_body_pos = local_pos_fk.reshape(1, 1, -1)
     task_body_rot = local_rot_fk.reshape(-1, 4)
-    task_body_rot = torch_utils.quat_to_tan_norm(task_body_rot).reshape(1, 1, -1)
+    task_body_rot = torch_utils.quat_to_rot6d(task_body_rot).reshape(1, 1, -1)
     
     # root_vel[0, 0, 0] = 0.0
     # task_body_pos[..., 0] = task_body_pos[..., 0] + 0.1
