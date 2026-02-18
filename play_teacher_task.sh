@@ -1,8 +1,6 @@
 
 # bash eval_teacher_task.sh 0927_twist_teacher_task
 
-export CUDA_VISIBLE_DEVICES=1
-
 task_name="g1_priv_mimic_task"
 proj_name="g1_priv_mimic_task"
 exptid=$1
