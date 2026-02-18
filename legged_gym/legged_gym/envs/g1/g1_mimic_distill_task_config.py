@@ -145,6 +145,7 @@ class G1MimicDistillTaskPrivCfg(HumanoidMimicCfg):
             "waist": 150,
             "shoulder": 40,
             "elbow": 40,
+            "wrist": 20,
         }  # [N*m/rad]
         damping = {
             "hip_yaw": 2,
@@ -155,6 +156,7 @@ class G1MimicDistillTaskPrivCfg(HumanoidMimicCfg):
             "waist": 4,
             "shoulder": 5,
             "elbow": 5,
+            "wrist": 2,
         }  # [N*m/rad]  # [N*m*s/rad]
 
         action_scale = 0.5
