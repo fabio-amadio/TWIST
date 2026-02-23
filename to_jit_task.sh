@@ -8,7 +8,7 @@ exptid=${1}
 proj_name="g1_stu_rl_task"
 
 # Run the training script
-python save_jit_stu_rlbc_task.py --robot "g1" \
+python save_jit_stu_rlbc_task.py \
                 --proj_name "${proj_name}" \
                 --exptid "${exptid}" \
                 --checkpoint -1 \
